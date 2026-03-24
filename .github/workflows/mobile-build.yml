@@ -8,52 +8,49 @@ on:
 
 jobs:
   build-android:
+    runs-on: ubuntu-latest
     permissions:
       contents: read
-    runs-on: ubuntu-latest
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+
     defaults:
       run:
         working-directory: ./mobile_app
 
     steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-    
-    - name: Fix Git global config for Flutter
-      run: |
-        git config --global --add safe.directory "${GITHUB_WORKSPACE}"
-        echo "Git version: $(git --version)"
-        echo "Workspace: ${GITHUB_WORKSPACE}"
-        ls -la
-      working-directory: .
-      
-    - name: Setup Java
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'zulu'
-        java-version: '17'
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          submodules: false
 
-    - name: Setup Flutter
-      uses: subosito/flutter-action@v2
-      with:
-        flutter-version: '3.x'
-        channel: 'stable'
-        
-    - name: Get dependencies
-      run: flutter pub get
-      
-    - name: Analyze code
-      run: flutter analyze --no-fatal-infos --no-fatal-warnings
-      
-    - name: Build APK
-      run: flutter build apk --release
-      
-    - name: Upload APK Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: inframon-field-tool-apk
-        path: ./mobile_app/build/app/outputs/flutter-apk/app-release.apk
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Verify project structure
+        run: |
+          pwd
+          ls -la
+          test -f pubspec.yaml || (echo "pubspec.yaml not found in mobile_app" && exit 1)
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Analyze code
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Build APK
+        run: flutter build apk --release
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: inframon-field-tool-apk
+          path: mobile_app/build/app/outputs/flutter-apk/app-release.apk
