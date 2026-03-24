@@ -11,6 +11,7 @@ import 'features/workforce/workforce_entry_screen.dart';
 import 'features/ai_feedback/ai_photo_screen.dart';
 import 'features/attendance/attendance_screen.dart';
 import 'features/notifications/notifications_screen.dart';
+import 'features/verification/verification_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -322,6 +323,7 @@ class _MainShellState extends State<MainShell> {
     AIPhotoScreen(),
     AttendanceScreen(),
     NotificationsScreen(),
+    VerificationScreen(),
   ];
 
   final List<_NavItem> _navItems = const [
@@ -332,6 +334,7 @@ class _MainShellState extends State<MainShell> {
     _NavItem(icon: Icons.auto_awesome_outlined, activeIcon: Icons.auto_awesome, label: 'AI Photo'),
     _NavItem(icon: Icons.access_time_outlined, activeIcon: Icons.access_time, label: 'Attendance'),
     _NavItem(icon: Icons.notifications_outlined, activeIcon: Icons.notifications, label: 'Alerts'),
+    _NavItem(icon: Icons.verified_user_outlined, activeIcon: Icons.verified_user, label: 'Verify'),
   ];
 
   @override

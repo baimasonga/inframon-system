@@ -26,7 +26,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   Future<void> _checkIn() async {
     setState(() => _loading = true);
     try {
-      final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      final pos = await Geolocator.getCurrentPosition(locationSettings: const LocationSettings(accuracy: LocationAccuracy.high));
       setState(() {
         _checkedIn = true;
         _checkInTime = DateFormat('HH:mm').format(DateTime.now());
