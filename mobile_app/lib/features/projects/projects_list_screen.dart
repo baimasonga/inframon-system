@@ -1,0 +1,307 @@
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../../main.dart';
+import '../inspections/inspection_form_screen.dart';
+import '../issues/issue_report_screen.dart';
+import 'timeline_screen.dart';
+import '../workforce/workforce_entry_screen.dart';
+import 'map_screen.dart';
+
+const _projects = [
+  {
+    'id': 'proj-1',
+    'name': 'Highway Renovation A1',
+    'status': 'active',
+    'phase': 'Phase 2: Structural Framing',
+    'progress': 0.45,
+    'inspections': 9,
+    'issues': 2,
+    'location': 'Freeway Junction, Sector 4',
+  },
+  {
+    'id': 'proj-2',
+    'name': 'City Hall Extension',
+    'status': 'planned',
+    'phase': 'Phase 1: Site Preparation',
+    'progress': 0.12,
+    'inspections': 2,
+    'issues': 1,
+    'location': 'Downtown District, Block 7',
+  },
+];
+
+class ProjectsListScreen extends StatelessWidget {
+  const ProjectsListScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.surface,
+      appBar: AppBar(
+        title: const Text('Projects'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.map_outlined),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const MapScreen()),
+            ),
+          ),
+        ],
+      ),
+      body: ListView.separated(
+        padding: const EdgeInsets.all(16),
+        itemCount: _projects.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        itemBuilder: (context, i) {
+          final p = _projects[i];
+          return _ProjectCard(project: p);
+        },
+      ),
+    );
+  }
+}
+
+class _ProjectCard extends StatefulWidget {
+  final Map<String, dynamic> project;
+  const _ProjectCard({required this.project});
+
+  @override
+  State<_ProjectCard> createState() => _ProjectCardState();
+}
+
+class _ProjectCardState extends State<_ProjectCard> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = widget.project;
+    final isActive = p['status'] == 'active';
+    final progress = (p['progress'] as double);
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isActive ? AppColors.blue.withOpacity(0.3) : AppColors.border,
+        ),
+        boxShadow: isActive
+            ? [
+                BoxShadow(
+                  color: AppColors.blue.withOpacity(0.08),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                )
+              ]
+            : [],
+      ),
+      child: Column(
+        children: [
+          // ── Header ──────────────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isActive ? AppColors.blueSoft : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        isActive ? '● Active' : 'Planned',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: isActive ? AppColors.blue : AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: () => setState(() => _expanded = !_expanded),
+                      child: Icon(
+                        _expanded ? Icons.expand_less : Icons.expand_more,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  p['name'],
+                  style: GoogleFonts.inter(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    const Icon(Icons.location_on_outlined, size: 14, color: AppColors.textSecondary),
+                    const SizedBox(width: 4),
+                    Text(p['location'],
+                        style: GoogleFonts.inter(fontSize: 12, color: AppColors.textSecondary)),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                // Progress
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(p['phase'],
+                              style: GoogleFonts.inter(
+                                  fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
+                          const SizedBox(height: 6),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: LinearProgressIndicator(
+                              value: progress,
+                              minHeight: 8,
+                              backgroundColor: AppColors.blueSoft,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                isActive ? AppColors.blue : AppColors.textSecondary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Text(
+                      '${(progress * 100).round()}%',
+                      style: GoogleFonts.inter(
+                          fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                // Mini stats
+                Row(
+                  children: [
+                    _MiniStat(icon: Icons.fact_check_outlined, label: '${p['inspections']} Inspections', color: AppColors.blue),
+                    const SizedBox(width: 16),
+                    _MiniStat(icon: Icons.flag_outlined, label: '${p['issues']} Issues', color: AppColors.danger),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // ── Expanded actions ─────────────────────────────────────────────
+          if (_expanded) ...[
+            const Divider(height: 1, color: AppColors.border),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Column(
+                children: [
+                  _ActionTile(
+                    icon: Icons.fact_check,
+                    label: 'New Inspection Form',
+                    iconColor: AppColors.blue,
+                    onTap: () => Navigator.push(context, MaterialPageRoute(
+                      builder: (_) => InspectionFormScreen(projectId: p['id']),
+                    )),
+                  ),
+                  _ActionTile(
+                    icon: Icons.report_problem,
+                    label: 'Report Issue',
+                    iconColor: AppColors.danger,
+                    onTap: () => Navigator.push(context, MaterialPageRoute(
+                      builder: (_) => IssueReportScreen(projectId: p['id']),
+                    )),
+                  ),
+                  _ActionTile(
+                    icon: Icons.timeline,
+                    label: 'Project Timeline',
+                    iconColor: AppColors.amber,
+                    onTap: () => Navigator.push(context, MaterialPageRoute(
+                      builder: (_) => TimelineScreen(projectId: p['id']),
+                    )),
+                  ),
+                  _ActionTile(
+                    icon: Icons.people_alt,
+                    label: 'Log Daily Workforce',
+                    iconColor: const Color(0xFF8B5CF6),
+                    onTap: () => Navigator.push(context, MaterialPageRoute(
+                      builder: (_) => WorkforceEntryScreen(projectId: p['id']),
+                    )),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniStat extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  const _MiniStat({required this.icon, required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: color),
+        const SizedBox(width: 5),
+        Text(label, style: GoogleFonts.inter(fontSize: 12, color: AppColors.textSecondary)),
+      ],
+    );
+  }
+}
+
+class _ActionTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color iconColor;
+  final VoidCallback onTap;
+  const _ActionTile({
+    required this.icon,
+    required this.label,
+    required this.iconColor,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: iconColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, size: 18, color: iconColor),
+            ),
+            const SizedBox(width: 14),
+            Text(label,
+                style: GoogleFonts.inter(
+                    fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+            const Spacer(),
+            const Icon(Icons.chevron_right, size: 18, color: AppColors.textSecondary),
+          ],
+        ),
+      ),
+    );
+  }
+}
