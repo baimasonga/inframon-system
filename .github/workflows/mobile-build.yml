@@ -1,0 +1,48 @@
+name: Flutter Mobile App Build
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'mobile_app/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'mobile_app/**'
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./mobile_app
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Java
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'zulu'
+        java-version: '17'
+
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.x'
+        channel: 'stable'
+        
+    - name: Get dependencies
+      run: flutter pub get
+      
+    - name: Analyze code
+      run: flutter analyze
+      
+    - name: Build APK
+      run: flutter build apk --release
+      
+    - name: Upload APK Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: inframon-field-tool-apk
+        path: mobile_app/build/app/outputs/flutter-apk/app-release.apk

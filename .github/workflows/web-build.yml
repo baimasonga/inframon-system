@@ -1,0 +1,38 @@
+name: Next.js Dashboard Build
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'web_dashboard/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'web_dashboard/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./web_dashboard
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: './web_dashboard/package-lock.json'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Build Next.js Dashboard
+      run: npm run build
+      env:
+        # Dummy keys fallback for CI pipeline compilation
+        NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder' }}
