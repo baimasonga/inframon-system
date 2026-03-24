@@ -8,6 +8,9 @@ import 'features/home/home_screen.dart';
 import 'features/projects/projects_list_screen.dart';
 import 'features/issues/issue_report_screen.dart';
 import 'features/workforce/workforce_entry_screen.dart';
+import 'features/ai_feedback/ai_photo_screen.dart';
+import 'features/attendance/attendance_screen.dart';
+import 'features/notifications/notifications_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -316,6 +319,9 @@ class _MainShellState extends State<MainShell> {
     ProjectsListScreen(),
     IssueReportScreen(projectId: 'all'),
     WorkforceEntryScreen(projectId: 'proj-1'),
+    AIPhotoScreen(),
+    AttendanceScreen(),
+    NotificationsScreen(),
   ];
 
   final List<_NavItem> _navItems = const [
@@ -323,6 +329,9 @@ class _MainShellState extends State<MainShell> {
     _NavItem(icon: Icons.folder_outlined, activeIcon: Icons.folder, label: 'Projects'),
     _NavItem(icon: Icons.flag_outlined, activeIcon: Icons.flag, label: 'Issues'),
     _NavItem(icon: Icons.people_outline, activeIcon: Icons.people, label: 'Workforce'),
+    _NavItem(icon: Icons.auto_awesome_outlined, activeIcon: Icons.auto_awesome, label: 'AI Photo'),
+    _NavItem(icon: Icons.access_time_outlined, activeIcon: Icons.access_time, label: 'Attendance'),
+    _NavItem(icon: Icons.notifications_outlined, activeIcon: Icons.notifications, label: 'Alerts'),
   ];
 
   @override
