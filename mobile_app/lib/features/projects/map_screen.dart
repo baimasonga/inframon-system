@@ -94,7 +94,7 @@ class MapScreen extends StatelessWidget {
                 const SizedBox(width: 4),
                 Text(
                   '${(project['lat'] as double).toStringAsFixed(4)}, ${(project['lng'] as double).toStringAsFixed(4)}',
-                  style: GoogleFonts.inter(fontSize: 12, color: AppColors.textSecondary, fontFamily: 'monospace'),
+                  style: GoogleFonts.robotoMono(fontSize: 12, color: AppColors.textSecondary),
                 ),
               ],
             ),
