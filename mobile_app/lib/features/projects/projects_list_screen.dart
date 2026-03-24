@@ -52,7 +52,7 @@ class ProjectsListScreen extends StatelessWidget {
       body: ListView.separated(
         padding: const EdgeInsets.all(16),
         itemCount: _projects.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        separatorBuilder: (context, index) => const SizedBox(height: 12),
         itemBuilder: (context, i) {
           final p = _projects[i];
           return _ProjectCard(project: p);
@@ -85,12 +85,12 @@ class _ProjectCardState extends State<_ProjectCard> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isActive ? AppColors.blue.withOpacity(0.3) : AppColors.border,
+          color: isActive ? AppColors.blue.withValues(alpha: 0.3) : AppColors.border,
         ),
         boxShadow: isActive
             ? [
                 BoxShadow(
-                  color: AppColors.blue.withOpacity(0.08),
+                  color: AppColors.blue.withValues(alpha: 0.08),
                   blurRadius: 16,
                   offset: const Offset(0, 4),
                 )
@@ -288,7 +288,7 @@ class _ActionTile extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: iconColor.withOpacity(0.1),
+                color: iconColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(icon, size: 18, color: iconColor),

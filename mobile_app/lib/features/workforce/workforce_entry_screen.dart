@@ -230,7 +230,10 @@ class _WorkforceEntryScreenState extends State<WorkforceEntryScreen> {
                           Switch(
                             value: _isYouth,
                             onChanged: (v) => setState(() => _isYouth = v),
-                            activeColor: AppColors.success,
+                            thumbColor: WidgetStateProperty.resolveWith<Color?>((states) {
+                              if (states.contains(WidgetState.selected)) return AppColors.success;
+                              return null;
+                            }),
                           ),
                         ],
                       ),

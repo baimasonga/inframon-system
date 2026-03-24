@@ -134,7 +134,7 @@ class MapScreen extends StatelessWidget {
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                            color: (isActive ? AppColors.blue : AppColors.textSecondary).withOpacity(0.4),
+                            color: (isActive ? AppColors.blue : AppColors.textSecondary).withValues(alpha: 0.4),
                             blurRadius: 8,
                             offset: const Offset(0, 3))
                       ],

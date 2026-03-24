@@ -238,7 +238,7 @@ class _InspectionFormScreenState extends State<InspectionFormScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.camera_alt_outlined, size: 40, color: AppColors.textSecondary.withOpacity(0.5)),
+                        Icon(Icons.camera_alt_outlined, size: 40, color: AppColors.textSecondary.withValues(alpha: 0.5)),
                         const SizedBox(height: 8),
                         Text('Tap to take inspection photo',
                             style: GoogleFonts.inter(fontSize: 13, color: AppColors.textSecondary)),
