@@ -21,7 +21,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-
+    
+    - name: Fix Git global config for Flutter
+      run: git config --global --add safe.directory '*'
+      
     - name: Setup Java
       uses: actions/setup-java@v4
       with:
@@ -33,9 +36,6 @@ jobs:
       with:
         flutter-version: '3.x'
         channel: 'stable'
-        
-    - name: Fix Git global config for Flutter
-      run: git config --global --add safe.directory '*'
         
     - name: Get dependencies
       run: flutter pub get
