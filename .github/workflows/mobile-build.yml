@@ -3,12 +3,8 @@ name: Flutter Mobile App Build
 on:
   push:
     branches: [ main ]
-    paths:
-      - 'mobile_app/**'
   pull_request:
     branches: [ main ]
-    paths:
-      - 'mobile_app/**'
 
 jobs:
   build-android:
@@ -28,7 +24,11 @@ jobs:
         fetch-depth: 0
     
     - name: Fix Git global config for Flutter
-      run: git config --global --add safe.directory "${GITHUB_WORKSPACE}"
+      run: |
+        git config --global --add safe.directory "${GITHUB_WORKSPACE}"
+        echo "Git version: $(git --version)"
+        echo "Workspace: ${GITHUB_WORKSPACE}"
+        ls -la
       working-directory: .
       
     - name: Setup Java
