@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import 'package:google_fonts/google_fonts.dart';
 import '../../main.dart';
 import '../../core/database/db_helper.dart';
@@ -60,7 +61,16 @@ class _WorkforceEntryScreenState extends State<WorkforceEntryScreen> {
       'entity_type': 'workforce_record',
       'entity_id': id,
       'operation': 'INSERT',
-      'payload': '{"role":"$_role","gender":"$_gender","count":${_countController.text},"youth":$_isYouth,"date":"$dateStr"}',
+      'payload': jsonEncode({
+        'id': id,
+        'project_id': widget.projectId,
+        'record_date': dateStr,
+        'role_category': _role,
+        'gender': _gender,
+        'is_youth': _isYouth,
+        'count': int.parse(_countController.text),
+        'created_at': DateTime.now().toIso8601String(),
+      }),
       'created_at': DateTime.now().toIso8601String(),
     });
     if (mounted) Navigator.pop(context);

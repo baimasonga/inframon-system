@@ -12,6 +12,7 @@ import 'features/ai_feedback/ai_photo_screen.dart';
 import 'features/attendance/attendance_screen.dart';
 import 'features/notifications/notifications_screen.dart';
 import 'features/verification/verification_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,6 +20,12 @@ void main() async {
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.light,
   ));
+  
+  await Supabase.initialize(
+    url: 'https://blfdifimwsctgqpcsdgm.supabase.co',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJsZmRpZmltd3NjdGdxcGNzZGdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzMDk0NzAsImV4cCI6MjA4OTg4NTQ3MH0.ohNhyiz9wuEwJKCm2CuHWm7xtP7uOhPCFKC1ddB_zkE',
+  );
+
   await DatabaseHelper.instance.database;
   runApp(const InfraMonApp());
 }

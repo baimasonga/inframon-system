@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../main.dart';
 import '../inspections/inspection_form_screen.dart';
 import '../issues/issue_report_screen.dart';
@@ -7,7 +8,7 @@ import 'timeline_screen.dart';
 import '../workforce/workforce_entry_screen.dart';
 import 'map_screen.dart';
 
-const _projects = [
+const _mockProjects = [
   {
     'id': 'proj-1',
     'name': 'Highway Renovation A1',
@@ -30,8 +31,66 @@ const _projects = [
   },
 ];
 
-class ProjectsListScreen extends StatelessWidget {
+class ProjectsListScreen extends StatefulWidget {
   const ProjectsListScreen({super.key});
+
+  @override
+  State<ProjectsListScreen> createState() => _ProjectsListScreenState();
+}
+
+class _ProjectsListScreenState extends State<ProjectsListScreen> {
+  List<Map<String, dynamic>> _projects = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchProjects();
+  }
+
+  Future<void> _fetchProjects() async {
+    try {
+      final data = await Supabase.instance.client
+          .from('projects')
+          .select()
+          .order('created_at', ascending: false);
+
+      if (data.isNotEmpty) {
+        final mapped = data.map((p) => {
+              'id': p['id'],
+              'name': p['name'],
+              'status': p['status'].toString().toLowerCase(),
+              'phase': p['status'] == 'Completed' ? 'Completed' : 'Phase 1: Tracking',
+              'progress': ((p['completion_percentage'] ?? 0) / 100).toDouble(),
+              'inspections': 0,
+              'issues': 0,
+              'location': p['district'],
+            }).toList();
+
+        if (mounted) {
+          setState(() {
+            _projects = List<Map<String, dynamic>>.from(mapped);
+            _isLoading = false;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _projects = List<Map<String, dynamic>>.from(_mockProjects);
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching projects: $e');
+      if (mounted) {
+        setState(() {
+          _projects = List<Map<String, dynamic>>.from(_mockProjects);
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,15 +108,17 @@ class ProjectsListScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: ListView.separated(
-        padding: const EdgeInsets.all(16),
-        itemCount: _projects.length,
-        separatorBuilder: (context, index) => const SizedBox(height: 12),
-        itemBuilder: (context, i) {
-          final p = _projects[i];
-          return _ProjectCard(project: p);
-        },
-      ),
+      body: _isLoading 
+        ? const Center(child: CircularProgressIndicator())
+        : ListView.separated(
+            padding: const EdgeInsets.all(16),
+            itemCount: _projects.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 12),
+            itemBuilder: (context, i) {
+              final p = _projects[i];
+              return _ProjectCard(project: p);
+            },
+          ),
     );
   }
 }

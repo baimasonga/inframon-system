@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
@@ -54,7 +55,13 @@ class _InspectionFormScreenState extends State<InspectionFormScreen> {
       'entity_type': 'inspection',
       'entity_id': id,
       'operation': 'INSERT',
-      'payload': '{"notes": "${_notesController.text}", "inspector": "${_inspectorController.text}"}',
+      'payload': jsonEncode({
+        'id': id,
+        'project_id': widget.projectId,
+        'status': 'Submitted',
+        'check_data': _checklist,
+        'created_at': DateTime.now().toIso8601String(),
+      }),
       'created_at': DateTime.now().toIso8601String(),
     });
     setState(() => _isSaving = false);

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
@@ -64,7 +65,17 @@ class _IssueReportScreenState extends State<IssueReportScreen> {
       'entity_type': 'issue',
       'entity_id': issueId,
       'operation': 'INSERT',
-      'payload': '{"title": "${_titleController.text}", "severity": "$_severity"}',
+      'payload': jsonEncode({
+        'id': issueId,
+        'project_id': widget.projectId,
+        'title': _titleController.text,
+        'description': _descController.text,
+        'severity': _severity,
+        'status': 'Open',
+        'gps_lat': _currentPosition?.latitude,
+        'gps_lng': _currentPosition?.longitude,
+        'created_at': DateTime.now().toIso8601String(),
+      }),
       'created_at': DateTime.now().toIso8601String(),
     });
     setState(() => _isSaving = false);

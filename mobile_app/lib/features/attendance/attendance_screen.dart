@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
+import 'dart:convert';
+import '../../core/database/db_helper.dart';
 
 class AttendanceScreen extends StatefulWidget {
   const AttendanceScreen({super.key});
@@ -47,6 +49,36 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     setState(() => _loading = true);
     await Future.delayed(const Duration(milliseconds: 500));
     final now = DateTime.now();
+
+    final db = await DatabaseHelper.instance.database;
+    final logId = DateTime.now().millisecondsSinceEpoch.toString();
+    final parts = _location?.split(', ') ?? [];
+    final lat = parts.isNotEmpty && parts[0] != 'GPS unavailable' ? double.tryParse(parts[0]) : null;
+    final lng = parts.length > 1 ? double.tryParse(parts[1]) : null;
+    
+    final start = DateFormat('HH:mm').parse(_checkInTime!);
+    final end = DateFormat('HH:mm').parse(DateFormat('HH:mm').format(now));
+    var hours = end.difference(start).inMinutes / 60.0;
+    if (hours < 0) hours = 0;
+
+    await db.insert('sync_queue', {
+      'entity_type': 'attendance_log',
+      'entity_id': logId,
+      'operation': 'INSERT',
+      'payload': jsonEncode({
+        'id': logId,
+        'project_id': 'proj-1', // Default assigned project in mock state
+        'check_in_time': DateTime(now.year, now.month, now.day, start.hour, start.minute).toIso8601String(),
+        'check_out_time': now.toIso8601String(),
+        'gps_lat': lat,
+        'gps_lng': lng,
+        'verified_gps': _location != 'GPS unavailable',
+        'total_hours': double.parse(hours.toStringAsFixed(1)),
+        'created_at': now.toIso8601String(),
+      }),
+      'created_at': now.toIso8601String(),
+    });
+
     setState(() {
       _checkOutTime = DateFormat('HH:mm').format(now);
       _checkedIn = false;
@@ -55,7 +87,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         date: DateFormat('MMM d, yyyy').format(now),
         checkIn: _checkInTime!,
         checkOut: _checkOutTime!,
-        hours: 8.2,
+        hours: double.parse(hours.toStringAsFixed(1)),
         project: 'Active Site',
         verified: _location != 'GPS unavailable',
       ));
