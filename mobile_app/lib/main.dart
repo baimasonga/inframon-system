@@ -6,7 +6,7 @@ import 'core/database/db_helper.dart';
 import 'features/sync/sync_provider.dart';
 import 'features/home/home_screen.dart';
 import 'features/projects/projects_list_screen.dart';
-import 'features/issues/issue_report_screen.dart';
+import 'features/issues/issues_list_screen.dart';
 import 'features/workforce/workforce_entry_screen.dart';
 import 'features/ai_feedback/ai_photo_screen.dart';
 import 'features/attendance/attendance_screen.dart';
@@ -318,7 +318,7 @@ class _MainShellState extends State<MainShell> {
   final List<Widget> _screens = const [
     HomeScreen(),
     ProjectsListScreen(),
-    IssueReportScreen(projectId: 'all'),
+    IssuesListScreen(),
     WorkforceEntryScreen(projectId: 'proj-1'),
     AIPhotoScreen(),
     AttendanceScreen(),
