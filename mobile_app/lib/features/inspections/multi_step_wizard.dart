@@ -13,14 +13,15 @@ class MultiStepInspectionWizard extends StatefulWidget {
   final String projectType;
 
   const MultiStepInspectionWizard({
-    super.key, 
-    required this.projectId, 
+    super.key,
+    required this.projectId,
     required this.projectName,
     required this.projectType,
   });
 
   @override
-  State<MultiStepInspectionWizard> createState() => _MultiStepInspectionWizardState();
+  State<MultiStepInspectionWizard> createState() =>
+      _MultiStepInspectionWizardState();
 }
 
 class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
@@ -33,18 +34,23 @@ class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
   String _weather = 'Clear / Sunny';
   bool _supervisorPresent = true;
   double _overallProgress = 0.5;
-  String _overallStatus = 'Fair';
-  String _recommendation = 'Continue work';
-  
+  final String _overallStatus = 'Fair';
+  final String _recommendation = 'Continue work';
+
   // Dynamic Data
   List<Map<String, dynamic>> _milestones = [];
   List<Map<String, dynamic>> _qualityChecks = [];
-  List<Map<String, dynamic>> _defects = [];
-  Map<String, dynamic> _workforce = {
-    'total': 0, 'male': 0, 'female': 0, 'youth': 0, 'local': 0, 'ppe': 80
+  final List<Map<String, dynamic>> _defects = [];
+  final Map<String, dynamic> _workforce = {
+    'total': 0,
+    'male': 0,
+    'female': 0,
+    'youth': 0,
+    'local': 0,
+    'ppe': 80,
   };
   List<Map<String, dynamic>> _materials = [];
-  List<File> _photos = [];
+  final List<File> _photos = [];
 
   @override
   void initState() {
@@ -55,9 +61,27 @@ class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
   void _initializeChecklists() {
     // Mocking template logic similar to web dashboard
     _milestones = [
-      {'id': 'm0000000-0000-0000-0000-000000000001', 'name': 'Site Clearance', 'status': 'Completed', 'pct': 100, 'delay': 0},
-      {'id': 'm0000000-0000-0000-0000-000000000002', 'name': 'Foundation Work', 'status': 'In Progress', 'pct': 45, 'delay': 2},
-      {'id': 'm0000000-0000-0000-0000-000000000003', 'name': 'Structural Framing', 'status': 'Not Started', 'pct': 0, 'delay': 0},
+      {
+        'id': 'm0000000-0000-0000-0000-000000000001',
+        'name': 'Site Clearance',
+        'status': 'Completed',
+        'pct': 100,
+        'delay': 0,
+      },
+      {
+        'id': 'm0000000-0000-0000-0000-000000000002',
+        'name': 'Foundation Work',
+        'status': 'In Progress',
+        'pct': 45,
+        'delay': 2,
+      },
+      {
+        'id': 'm0000000-0000-0000-0000-000000000003',
+        'name': 'Structural Framing',
+        'status': 'Not Started',
+        'pct': 0,
+        'delay': 0,
+      },
     ];
     _qualityChecks = [
       {'item': 'Concrete Grade (C25/30)', 'pass': true},
@@ -74,7 +98,10 @@ class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
   // ── Actions ───────────────────────────────────────────────────────────────
   Future<void> _pickPhoto() async {
     final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.camera, imageQuality: 70);
+    final picked = await picker.pickImage(
+      source: ImageSource.camera,
+      imageQuality: 70,
+    );
     if (picked != null) setState(() => _photos.add(File(picked.path)));
   }
 
@@ -82,7 +109,7 @@ class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
     setState(() => _isSaving = true);
     final db = await DatabaseHelper.instance.database;
     final visitId = DateTime.now().millisecondsSinceEpoch.toString();
-    
+
     // 1. Prepare Payload for Cloud RPC
     final payload = {
       'project_id': widget.projectId,
@@ -97,20 +124,52 @@ class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
       'notes': _notesController.text,
       'gps_lat': 8.484, // Simplified GPS for demo
       'gps_lng': -13.234,
-      'milestones': _milestones.map((m) => {
-        'id': m['id'], 'status': m['status'], 'pct': m['pct'], 'delay_days': m['delay'], 'reason': ''
-      }).toList(),
-      'issues': _defects.map((d) => {
-        'title': d['title'], 'category': d['category'], 'severity': d['severity'], 'action': d['action'], 'responsible': d['responsible'], 'deadline': d['deadline']
-      }).toList(),
+      'milestones': _milestones
+          .map(
+            (m) => {
+              'id': m['id'],
+              'status': m['status'],
+              'pct': m['pct'],
+              'delay_days': m['delay'],
+              'reason': '',
+            },
+          )
+          .toList(),
+      'issues': _defects
+          .map(
+            (d) => {
+              'title': d['title'],
+              'category': d['category'],
+              'severity': d['severity'],
+              'action': d['action'],
+              'responsible': d['responsible'],
+              'deadline': d['deadline'],
+            },
+          )
+          .toList(),
       'workforce_details': [
-        {'role': 'Total Labor', 'count': _workforce['total'], 'gender': 'Male', 'is_youth': false},
-        {'role': 'Female Participation', 'count': _workforce['female'], 'gender': 'Female', 'is_youth': false},
-        {'role': 'Youth Labor', 'count': _workforce['youth'], 'gender': 'Mixed', 'is_youth': true},
+        {
+          'role': 'Total Labor',
+          'count': _workforce['total'],
+          'gender': 'Male',
+          'is_youth': false,
+        },
+        {
+          'role': 'Female Participation',
+          'count': _workforce['female'],
+          'gender': 'Female',
+          'is_youth': false,
+        },
+        {
+          'role': 'Youth Labor',
+          'count': _workforce['youth'],
+          'gender': 'Mixed',
+          'is_youth': true,
+        },
       ],
-      'materials': _materials.map((m) => {
-        'item': m['item'], 'pass': m['pass'], 'notes': ''
-      }).toList(),
+      'materials': _materials
+          .map((m) => {'item': m['item'], 'pass': m['pass'], 'notes': ''})
+          .toList(),
     };
 
     // 2. Save Locally for Resilience
@@ -143,7 +202,9 @@ class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
     setState(() => _isSaving = false);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Report saved and queued for synchronization!'))
+        const SnackBar(
+          content: Text('Report saved and queued for synchronization!'),
+        ),
       );
       Navigator.pop(context);
     }
@@ -156,14 +217,23 @@ class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: Text('Site Inspection Wizard', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 18)),
+        title: Text(
+          'Site Inspection Wizard',
+          style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 18),
+        ),
         actions: [
           Center(
             child: Padding(
               padding: const EdgeInsets.only(right: 16),
-              child: Text('${_currentStep + 1} / 7', style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: AppColors.blue)),
+              child: Text(
+                '${_currentStep + 1} / 7',
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.blue,
+                ),
+              ),
             ),
-          )
+          ),
         ],
       ),
       body: Column(
@@ -188,14 +258,22 @@ class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
 
   Widget _buildCurrentStep() {
     switch (_currentStep) {
-      case 0: return _stepMetadata();
-      case 1: return _stepProgress();
-      case 2: return _stepQuality();
-      case 3: return _stepDefects();
-      case 4: return _stepWorkforce();
-      case 5: return _stepMaterials();
-      case 6: return _stepSummary();
-      default: return const SizedBox.shrink();
+      case 0:
+        return _stepMetadata();
+      case 1:
+        return _stepProgress();
+      case 2:
+        return _stepQuality();
+      case 3:
+        return _stepDefects();
+      case 4:
+        return _stepWorkforce();
+      case 5:
+        return _stepMaterials();
+      case 6:
+        return _stepSummary();
+      default:
+        return const SizedBox.shrink();
     }
   }
 
@@ -204,13 +282,30 @@ class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _pageTitle('Visit Information', 'Capture the baseline context of this site visit.'),
+        _pageTitle(
+          'Visit Information',
+          'Capture the baseline context of this site visit.',
+        ),
         const SizedBox(height: 24),
-        _buildDropdown('Visit Type', _visitType, ['Routine', 'Milestone', 'Ad-hoc', 'Follow-up'], (v) => setState(() => _visitType = v!)),
+        _buildDropdown('Visit Type', _visitType, [
+          'Routine',
+          'Milestone',
+          'Ad-hoc',
+          'Follow-up',
+        ], (v) => setState(() => _visitType = v!)),
         const SizedBox(height: 16),
-        _buildDropdown('Weather Condition', _weather, ['Clear / Sunny', 'Overcast', 'Light Rain', 'Heavy Rain / Storm'], (v) => setState(() => _weather = v!)),
+        _buildDropdown('Weather Condition', _weather, [
+          'Clear / Sunny',
+          'Overcast',
+          'Light Rain',
+          'Heavy Rain / Storm',
+        ], (v) => setState(() => _weather = v!)),
         const SizedBox(height: 16),
-        _buildSwitch('Site Supervisor Present', _supervisorPresent, (v) => setState(() => _supervisorPresent = v)),
+        _buildSwitch(
+          'Site Supervisor Present',
+          _supervisorPresent,
+          (v) => setState(() => _supervisorPresent = v),
+        ),
       ],
     );
   }
@@ -220,9 +315,15 @@ class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _pageTitle('Physical Progress', 'Verify completion percentages for active milestones.'),
+        _pageTitle(
+          'Physical Progress',
+          'Verify completion percentages for active milestones.',
+        ),
         const SizedBox(height: 24),
-        Text('Overall Site Completion: ${(_overallProgress * 100).toInt()}%', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 15)),
+        Text(
+          'Overall Site Completion: ${(_overallProgress * 100).toInt()}%',
+          style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 15),
+        ),
         const SizedBox(height: 8),
         Slider(
           value: _overallProgress,
@@ -230,33 +331,57 @@ class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
           activeColor: AppColors.blue,
         ),
         const SizedBox(height: 24),
-        Text('Milestone Tracking', style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
-        const SizedBox(height: 12),
-        ..._milestones.map((m) => Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.border)),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(m['name'], style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14)),
-                  Text('${m['pct']}%', style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: AppColors.blue)),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  _statusTag(m['status']),
-                  const Spacer(),
-                  _delayTag(m['delay']),
-                ],
-              )
-            ],
+        Text(
+          'Milestone Tracking',
+          style: GoogleFonts.inter(
+            fontWeight: FontWeight.bold,
+            color: AppColors.textSecondary,
           ),
-        )),
+        ),
+        const SizedBox(height: 12),
+        ..._milestones.map(
+          (m) => Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      m['name'],
+                      style: GoogleFonts.inter(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                    Text(
+                      '${m['pct']}%',
+                      style: GoogleFonts.inter(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.blue,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    _statusTag(m['status']),
+                    const Spacer(),
+                    _delayTag(m['delay']),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -266,15 +391,29 @@ class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _pageTitle('Technical Quality', 'Pass/Fail checks for critical technical specifications.'),
+        _pageTitle(
+          'Technical Quality',
+          'Pass/Fail checks for critical technical specifications.',
+        ),
         const SizedBox(height: 24),
-        ..._qualityChecks.map((qc) => CheckboxListTile(
-          title: Text(qc['item'], style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w500)),
-          value: qc['pass'],
-          onChanged: (v) => setState(() => qc['pass'] = v),
-          secondary: Icon(qc['pass'] ? Icons.check_circle : Icons.error_outline, color: qc['pass'] ? AppColors.success : AppColors.danger),
-          contentPadding: EdgeInsets.zero,
-        )),
+        ..._qualityChecks.map(
+          (qc) => CheckboxListTile(
+            title: Text(
+              qc['item'],
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            value: qc['pass'],
+            onChanged: (v) => setState(() => qc['pass'] = v),
+            secondary: Icon(
+              qc['pass'] ? Icons.check_circle : Icons.error_outline,
+              color: qc['pass'] ? AppColors.success : AppColors.danger,
+            ),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
       ],
     );
   }
@@ -284,18 +423,40 @@ class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _pageTitle('Site Defects & Issues', 'Record any non-compliance or structural hazards found.'),
+        _pageTitle(
+          'Site Defects & Issues',
+          'Record any non-compliance or structural hazards found.',
+        ),
         const SizedBox(height: 16),
-        if (_defects.isEmpty) 
+        if (_defects.isEmpty)
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(40),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: AppColors.border, style: BorderStyle.none)),
-            child: Column(children: [
-              Icon(Icons.assignment_turned_in_outlined, size: 48, color: AppColors.textSecondary.withValues(alpha: 0.2)),
-              const SizedBox(height: 12),
-              Text('No issues detected so far.', style: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 13)),
-            ]),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: AppColors.border,
+                style: BorderStyle.none,
+              ),
+            ),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.assignment_turned_in_outlined,
+                  size: 48,
+                  color: AppColors.textSecondary.withValues(alpha: 0.2),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'No issues detected so far.',
+                  style: GoogleFonts.inter(
+                    color: AppColors.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
           ),
         ..._defects.map((d) => _buildDefectCard(d)),
         const SizedBox(height: 20),
@@ -309,10 +470,12 @@ class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.danger,
               side: const BorderSide(color: AppColors.danger),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           ),
-        )
+        ),
       ],
     );
   }
@@ -322,21 +485,49 @@ class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _pageTitle('Workforce & Social Impact', 'Capture headcount and compliance metrics.'),
+        _pageTitle(
+          'Workforce & Social Impact',
+          'Capture headcount and compliance metrics.',
+        ),
         const SizedBox(height: 24),
-        _buildCounter('Total Workers Active', _workforce['total'], (v) => setState(() => _workforce['total'] = v)),
-        _buildCounter('Female Participation', _workforce['female'], (v) => setState(() => _workforce['female'] = v)),
-        _buildCounter('Youth Training (<25)', _workforce['youth'], (v) => setState(() => _workforce['youth'] = v)),
-        _buildCounter('Local District Labor', _workforce['local'], (v) => setState(() => _workforce['local'] = v)),
+        _buildCounter(
+          'Total Workers Active',
+          _workforce['total'],
+          (v) => setState(() => _workforce['total'] = v),
+        ),
+        _buildCounter(
+          'Female Participation',
+          _workforce['female'],
+          (v) => setState(() => _workforce['female'] = v),
+        ),
+        _buildCounter(
+          'Youth Training (<25)',
+          _workforce['youth'],
+          (v) => setState(() => _workforce['youth'] = v),
+        ),
+        _buildCounter(
+          'Local District Labor',
+          _workforce['local'],
+          (v) => setState(() => _workforce['local'] = v),
+        ),
         const SizedBox(height: 16),
         _pageTitle('Safety Protection', 'PPE compliance percentage.'),
         Slider(
           value: _workforce['ppe'].toDouble(),
-          min: 0, max: 100,
+          min: 0,
+          max: 100,
           onChanged: (v) => setState(() => _workforce['ppe'] = v.toInt()),
           activeColor: AppColors.success,
         ),
-        Center(child: Text('${_workforce['ppe']}% Protection Ratio', style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: AppColors.success))),
+        Center(
+          child: Text(
+            '${_workforce['ppe']}% Protection Ratio',
+            style: GoogleFonts.inter(
+              fontWeight: FontWeight.bold,
+              color: AppColors.success,
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -346,12 +537,21 @@ class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _pageTitle('Materials Verification', 'Confirm quality of raw materials arrived on site.'),
+        _pageTitle(
+          'Materials Verification',
+          'Confirm quality of raw materials arrived on site.',
+        ),
         const SizedBox(height: 24),
-        ..._materials.map((m) => ListTile(
-          title: Text(m['item'], style: GoogleFonts.inter(fontSize: 14)),
-          trailing: Switch(value: m['pass'], onChanged: (v) => setState(() => m['pass'] = v), activeColor: AppColors.blue),
-        )),
+        ..._materials.map(
+          (m) => ListTile(
+            title: Text(m['item'], style: GoogleFonts.inter(fontSize: 14)),
+            trailing: Switch(
+              value: m['pass'],
+              onChanged: (v) => setState(() => m['pass'] = v),
+              activeThumbColor: AppColors.blue,
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -361,7 +561,10 @@ class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _pageTitle('Review & Finalise', 'Summary of indices captured. Please review before submission.'),
+        _pageTitle(
+          'Review & Finalise',
+          'Summary of indices captured. Please review before submission.',
+        ),
         const SizedBox(height: 24),
         _buildSummaryCard(),
         const SizedBox(height: 24),
@@ -371,32 +574,50 @@ class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
           controller: _notesController,
           maxLines: 4,
           decoration: InputDecoration(
-            hintText: 'Describe general site mood, complex delays, or urgent needs...',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: AppColors.border)),
+            hintText:
+                'Describe general site mood, complex delays, or urgent needs...',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(color: AppColors.border),
+            ),
             filled: true,
             fillColor: Colors.white,
           ),
         ),
         const SizedBox(height: 24),
-        _pageTitle('Visual Evidence', 'Capture photos to backup your findings.'),
+        _pageTitle(
+          'Visual Evidence',
+          'Capture photos to backup your findings.',
+        ),
         const SizedBox(height: 12),
         Wrap(
-          spacing: 10, runSpacing: 10,
+          spacing: 10,
+          runSpacing: 10,
           children: [
-            ..._photos.map((f) => ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.file(f, width: 80, height: 80, fit: BoxFit.cover),
-            )),
+            ..._photos.map(
+              (f) => ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.file(f, width: 80, height: 80, fit: BoxFit.cover),
+              ),
+            ),
             InkWell(
               onTap: _pickPhoto,
               child: Container(
-                width: 80, height: 80,
-                decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppColors.border), borderRadius: BorderRadius.circular(12)),
-                child: const Icon(Icons.add_a_photo_outlined, color: AppColors.blue),
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: AppColors.border),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.add_a_photo_outlined,
+                  color: AppColors.blue,
+                ),
               ),
-            )
+            ),
           ],
-        )
+        ),
       ],
     );
   }
@@ -407,27 +628,64 @@ class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 22, color: const Color(0xFF0F172A))),
+        Text(
+          title,
+          style: GoogleFonts.inter(
+            fontWeight: FontWeight.bold,
+            fontSize: 22,
+            color: const Color(0xFF0F172A),
+          ),
+        ),
         const SizedBox(height: 4),
-        Text(subtitle, style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B))),
+        Text(
+          subtitle,
+          style: GoogleFonts.inter(
+            fontSize: 13,
+            color: const Color(0xFF64748B),
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildDropdown(String label, String value, List<String> items, Function(String?) onChanged) {
+  Widget _buildDropdown(
+    String label,
+    String value,
+    List<String> items,
+    Function(String?) onChanged,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary, letterSpacing: 0.5)),
+        Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: AppColors.textSecondary,
+            letterSpacing: 0.5,
+          ),
+        ),
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.border)),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.border),
+          ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
               isExpanded: true,
               value: value,
-              items: items.map((t) => DropdownMenuItem(value: t, child: Text(t, style: GoogleFonts.inter(fontSize: 14)))).toList(),
+              items: items
+                  .map(
+                    (t) => DropdownMenuItem(
+                      value: t,
+                      child: Text(t, style: GoogleFonts.inter(fontSize: 14)),
+                    ),
+                  )
+                  .toList(),
               onChanged: onChanged,
             ),
           ),
@@ -438,11 +696,14 @@ class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
 
   Widget _buildSwitch(String label, bool value, Function(bool) onChanged) {
     return SwitchListTile(
-      title: Text(label, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600)),
+      title: Text(
+        label,
+        style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600),
+      ),
       value: value,
       onChanged: onChanged,
       contentPadding: EdgeInsets.zero,
-      activeColor: AppColors.blue,
+      activeThumbColor: AppColors.blue,
     );
   }
 
@@ -452,14 +713,37 @@ class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: GoogleFonts.inter(fontWeight: FontWeight.w500, fontSize: 14)),
+          Text(
+            label,
+            style: GoogleFonts.inter(fontWeight: FontWeight.w500, fontSize: 14),
+          ),
           Row(
             children: [
-              IconButton(icon: const Icon(Icons.remove_circle_outline), onPressed: () => onChanged(value > 0 ? value - 1 : 0)),
-              SizedBox(width: 40, child: Center(child: Text('$value', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)))),
-              IconButton(icon: const Icon(Icons.add_circle_outline, color: AppColors.blue), onPressed: () => onChanged(value + 1)),
+              IconButton(
+                icon: const Icon(Icons.remove_circle_outline),
+                onPressed: () => onChanged(value > 0 ? value - 1 : 0),
+              ),
+              SizedBox(
+                width: 40,
+                child: Center(
+                  child: Text(
+                    '$value',
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(
+                  Icons.add_circle_outline,
+                  color: AppColors.blue,
+                ),
+                onPressed: () => onChanged(value + 1),
+              ),
             ],
-          )
+          ),
         ],
       ),
     );
@@ -468,17 +752,40 @@ class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
   Widget _statusTag(String status) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(color: status == 'Completed' ? Colors.emerald.withValues(alpha: 0.1) : Colors.blue.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
-      child: Text(status, style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: status == 'Completed' ? AppColors.success : AppColors.blue)),
+      decoration: BoxDecoration(
+        color: status == 'Completed'
+            ? Colors.emerald.withValues(alpha: 0.1)
+            : Colors.blue.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        status,
+        style: GoogleFonts.inter(
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          color: status == 'Completed' ? AppColors.success : AppColors.blue,
+        ),
+      ),
     );
   }
 
   Widget _delayTag(int days) {
     return Row(
       children: [
-        Icon(Icons.timer_outlined, size: 12, color: days > 0 ? AppColors.danger : AppColors.textSecondary),
+        Icon(
+          Icons.timer_outlined,
+          size: 12,
+          color: days > 0 ? AppColors.danger : AppColors.textSecondary,
+        ),
         const SizedBox(width: 4),
-        Text(days > 0 ? '+$days days' : 'On Track', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: days > 0 ? AppColors.danger : AppColors.textSecondary)),
+        Text(
+          days > 0 ? '+$days days' : 'On Track',
+          style: GoogleFonts.inter(
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            color: days > 0 ? AppColors.danger : AppColors.textSecondary,
+          ),
+        ),
       ],
     );
   }
@@ -487,34 +794,110 @@ class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: const Color(0xFFFEF2F2), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFFEE2E2))),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text(d['title'], style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: const Color(0xFF991B1B))),
-          Container(padding: const EdgeInsets.all(4), decoration: BoxDecoration(color: const Color(0xFF991B1B), borderRadius: BorderRadius.circular(4)), child: Text(d['severity'], style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold))),
-        ]),
-        const SizedBox(height: 8),
-        Text(d['action'], style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFFB91C1C))),
-      ]),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFEF2F2),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFFEE2E2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                d['title'],
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF991B1B),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF991B1B),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  d['severity'],
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            d['action'],
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: const Color(0xFFB91C1C),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildSummaryCard() {
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: const Color(0xFF0F172A), borderRadius: BorderRadius.circular(24), boxShadow: [BoxShadow(color: AppColors.blue.withValues(alpha: 0.2), blurRadius: 20, offset: const Offset(0, 10))]),
-      child: Column(children: [
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          _SummaryItem(label: 'Progress', value: '${(_overallProgress * 100).toInt()}%', color: Colors.blue),
-          _SummaryItem(label: 'Issues', value: '${_defects.length}', color: Colors.red),
-          _SummaryItem(label: 'QC Pass', value: '${_qualityChecks.where((q)=>q['pass']).length}/${_qualityChecks.length}', color: Colors.emerald),
-        ]),
-        const Divider(color: Colors.white10, height: 32),
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text('Workforce Presence', style: GoogleFonts.inter(color: Colors.white70, fontSize: 13)),
-          Text('${_workforce['total']} Active Workers', style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: Colors.white)),
-        ])
-      ]),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.blue.withValues(alpha: 0.2),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _SummaryItem(
+                label: 'Progress',
+                value: '${(_overallProgress * 100).toInt()}%',
+                color: Colors.blue,
+              ),
+              _SummaryItem(
+                label: 'Issues',
+                value: '${_defects.length}',
+                color: Colors.red,
+              ),
+              _SummaryItem(
+                label: 'QC Pass',
+                value:
+                    '${_qualityChecks.where((q) => q['pass']).length}/${_qualityChecks.length}',
+                color: Colors.emerald,
+              ),
+            ],
+          ),
+          const Divider(color: Colors.white10, height: 32),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Workforce Presence',
+                style: GoogleFonts.inter(color: Colors.white70, fontSize: 13),
+              ),
+              Text(
+                '${_workforce['total']} Active Workers',
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -526,37 +909,71 @@ class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
     String cat = 'Structural defects';
 
     showModalBottomSheet(
-      context: context, 
-      isScrollControlled: true, 
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
       builder: (_) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 24, right: 24, top: 24),
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+          left: 24,
+          right: 24,
+          top: 24,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Log Site Defect', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 18)),
+            Text(
+              'Log Site Defect',
+              style: GoogleFonts.inter(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
+            ),
             const SizedBox(height: 16),
-            TextField(controller: titleC, decoration: const InputDecoration(labelText: 'Issue Title')),
+            TextField(
+              controller: titleC,
+              decoration: const InputDecoration(labelText: 'Issue Title'),
+            ),
             const SizedBox(height: 12),
-            TextField(controller: actionC, decoration: const InputDecoration(labelText: 'Mitigation Plan')),
+            TextField(
+              controller: actionC,
+              decoration: const InputDecoration(labelText: 'Mitigation Plan'),
+            ),
             const SizedBox(height: 12),
-            TextField(controller: respC, decoration: const InputDecoration(labelText: 'Responsible Entity')),
+            TextField(
+              controller: respC,
+              decoration: const InputDecoration(
+                labelText: 'Responsible Entity',
+              ),
+            ),
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: () {
-                setState(() => _defects.add({
-                  'title': titleC.text, 'category': cat, 'severity': sev, 'action': actionC.text, 'responsible': respC.text, 'deadline': '2026-05-01'
-                }));
+                setState(
+                  () => _defects.add({
+                    'title': titleC.text,
+                    'category': cat,
+                    'severity': sev,
+                    'action': actionC.text,
+                    'responsible': respC.text,
+                    'deadline': '2026-05-01',
+                  }),
+                );
                 Navigator.pop(context);
               },
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger, minimumSize: const Size(double.infinity, 50)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.danger,
+                minimumSize: const Size(double.infinity, 50),
+              ),
               child: const Text('Record Defect'),
             ),
             const SizedBox(height: 40),
           ],
         ),
-      )
+      ),
     );
   }
 
@@ -570,7 +987,12 @@ class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
             Expanded(
               child: OutlinedButton(
                 onPressed: () => setState(() => _currentStep--),
-                style: OutlinedButton.styleFrom(height: 52, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+                style: OutlinedButton.styleFrom(
+                  height: 52,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
                 child: const Text('Previous'),
               ),
             ),
@@ -578,21 +1000,32 @@ class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
           ],
           Expanded(
             child: ElevatedButton(
-              onPressed: _isSaving ? null : () {
-                if (_currentStep < 6) {
-                  setState(() => _currentStep++);
-                } else {
-                  _saveFinalReport();
-                }
-              },
+              onPressed: _isSaving
+                  ? null
+                  : () {
+                      if (_currentStep < 6) {
+                        setState(() => _currentStep++);
+                      } else {
+                        _saveFinalReport();
+                      }
+                    },
               style: ElevatedButton.styleFrom(
-                backgroundColor: _currentStep == 6 ? AppColors.success : AppColors.blue,
+                backgroundColor: _currentStep == 6
+                    ? AppColors.success
+                    : AppColors.blue,
                 height: 52,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
               ),
               child: _isSaving
-                ? const CircularProgressIndicator(color: Colors.white)
-                : Text(_currentStep == 6 ? 'SUBMIT REPORT' : 'Continue Verification', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+                  ? const CircularProgressIndicator(color: Colors.white)
+                  : Text(
+                      _currentStep == 6
+                          ? 'SUBMIT REPORT'
+                          : 'Continue Verification',
+                      style: GoogleFonts.inter(fontWeight: FontWeight.bold),
+                    ),
             ),
           ),
         ],
@@ -604,13 +1037,29 @@ class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
 class _SummaryItem extends StatelessWidget {
   final String label, value;
   final Color color;
-  const _SummaryItem({required this.label, required this.value, required this.color});
+  const _SummaryItem({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
   @override
   Widget build(BuildContext context) {
-    return Column(children: [
-      Text(value, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 22, color: color)),
-      Text(label, style: GoogleFonts.inter(color: Colors.white54, fontSize: 11)),
-    ]);
+    return Column(
+      children: [
+        Text(
+          value,
+          style: GoogleFonts.inter(
+            fontWeight: FontWeight.bold,
+            fontSize: 22,
+            color: color,
+          ),
+        ),
+        Text(
+          label,
+          style: GoogleFonts.inter(color: Colors.white54, fontSize: 11),
+        ),
+      ],
+    );
   }
 }
 
@@ -619,6 +1068,14 @@ class _SectionTitle extends StatelessWidget {
   const _SectionTitle(this.text);
   @override
   Widget build(BuildContext context) {
-    return Text(text, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary, letterSpacing: 0.5));
+    return Text(
+      text,
+      style: GoogleFonts.inter(
+        fontSize: 12,
+        fontWeight: FontWeight.bold,
+        color: AppColors.textSecondary,
+        letterSpacing: 0.5,
+      ),
+    );
   }
 }

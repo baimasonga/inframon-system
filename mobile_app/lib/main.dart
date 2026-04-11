@@ -11,20 +11,22 @@ import 'features/workforce/workforce_entry_screen.dart';
 import 'features/ai_feedback/ai_photo_screen.dart';
 import 'features/attendance/attendance_screen.dart';
 import 'features/notifications/notifications_screen.dart';
-import 'features/verification/verification_screen.dart';
 import 'features/tasks/tasks_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-    statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.light,
-  ));
-  
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+    ),
+  );
+
   await Supabase.initialize(
     url: 'https://blfdifimwsctgqpcsdgm.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJsZmRpZmltd3NjdGdxcGNzZGdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzMDk0NzAsImV4cCI6MjA4OTg4NTQ3MH0.ohNhyiz9wuEwJKCm2CuHWm7xtP7uOhPCFKC1ddB_zkE',
+    anonKey:
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJsZmRpZmltd3NjdGdxcGNzZGdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzMDk0NzAsImV4cCI6MjA4OTg4NTQ3MH0.ohNhyiz9wuEwJKCm2CuHWm7xtP7uOhPCFKC1ddB_zkE',
   );
 
   await DatabaseHelper.instance.database;
@@ -102,9 +104,14 @@ class InfraMonApp extends StatelessWidget {
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.blue,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-              textStyle: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600),
+              textStyle: GoogleFonts.inter(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
               elevation: 0,
             ),
           ),
@@ -117,7 +124,9 @@ class InfraMonApp extends StatelessWidget {
             ),
           ),
           chipTheme: ChipThemeData(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
           ),
           scaffoldBackgroundColor: AppColors.surface,
         ),
@@ -162,17 +171,17 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
     setState(() => _isLoading = true);
-    
+
     try {
       final response = await Supabase.instance.client.auth.signInWithPassword(
         email: email,
         password: password,
       );
-      
+
       if (mounted && response.user != null) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const MainShell()),
-        );
+        Navigator.of(
+          context,
+        ).pushReplacement(MaterialPageRoute(builder: (_) => const MainShell()));
       }
     } catch (e) {
       if (mounted) {
@@ -218,7 +227,11 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ],
                     ),
-                    child: const Icon(Icons.domain, size: 48, color: Colors.white),
+                    child: const Icon(
+                      Icons.domain,
+                      size: 48,
+                      color: Colors.white,
+                    ),
                   ),
                   const SizedBox(height: 24),
                   Text(
@@ -281,7 +294,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           keyboardType: TextInputType.emailAddress,
                           decoration: const InputDecoration(
                             labelText: 'Work Email',
-                            prefixIcon: Icon(Icons.email_outlined, color: AppColors.textSecondary),
+                            prefixIcon: Icon(
+                              Icons.email_outlined,
+                              color: AppColors.textSecondary,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -290,13 +306,20 @@ class _LoginScreenState extends State<LoginScreen> {
                           obscureText: _obscurePassword,
                           decoration: InputDecoration(
                             labelText: 'Password',
-                            prefixIcon: const Icon(Icons.lock_outline, color: AppColors.textSecondary),
+                            prefixIcon: const Icon(
+                              Icons.lock_outline,
+                              color: AppColors.textSecondary,
+                            ),
                             suffixIcon: IconButton(
                               icon: Icon(
-                                _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                                _obscurePassword
+                                    ? Icons.visibility_off
+                                    : Icons.visibility,
                                 color: AppColors.textSecondary,
                               ),
-                              onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                              onPressed: () => setState(
+                                () => _obscurePassword = !_obscurePassword,
+                              ),
                             ),
                           ),
                         ),
@@ -363,14 +386,46 @@ class _MainShellState extends State<MainShell> {
   ];
 
   final List<_NavItem> _navItems = const [
-    _NavItem(icon: Icons.dashboard_outlined, activeIcon: Icons.dashboard, label: 'Home'),
-    _NavItem(icon: Icons.folder_outlined, activeIcon: Icons.folder, label: 'Projects'),
-    _NavItem(icon: Icons.assignment_outlined, activeIcon: Icons.assignment, label: 'Tasks'),
-    _NavItem(icon: Icons.flag_outlined, activeIcon: Icons.flag, label: 'Issues'),
-    _NavItem(icon: Icons.people_outline, activeIcon: Icons.people, label: 'Workforce'),
-    _NavItem(icon: Icons.auto_awesome_outlined, activeIcon: Icons.auto_awesome, label: 'AI Photo'),
-    _NavItem(icon: Icons.access_time_outlined, activeIcon: Icons.access_time, label: 'Attendance'),
-    _NavItem(icon: Icons.notifications_outlined, activeIcon: Icons.notifications, label: 'Alerts'),
+    _NavItem(
+      icon: Icons.dashboard_outlined,
+      activeIcon: Icons.dashboard,
+      label: 'Home',
+    ),
+    _NavItem(
+      icon: Icons.folder_outlined,
+      activeIcon: Icons.folder,
+      label: 'Projects',
+    ),
+    _NavItem(
+      icon: Icons.assignment_outlined,
+      activeIcon: Icons.assignment,
+      label: 'Tasks',
+    ),
+    _NavItem(
+      icon: Icons.flag_outlined,
+      activeIcon: Icons.flag,
+      label: 'Issues',
+    ),
+    _NavItem(
+      icon: Icons.people_outline,
+      activeIcon: Icons.people,
+      label: 'Workforce',
+    ),
+    _NavItem(
+      icon: Icons.auto_awesome_outlined,
+      activeIcon: Icons.auto_awesome,
+      label: 'AI Photo',
+    ),
+    _NavItem(
+      icon: Icons.access_time_outlined,
+      activeIcon: Icons.access_time,
+      label: 'Attendance',
+    ),
+    _NavItem(
+      icon: Icons.notifications_outlined,
+      activeIcon: Icons.notifications,
+      label: 'Alerts',
+    ),
   ];
 
   @override
@@ -390,21 +445,29 @@ class _MainShellState extends State<MainShell> {
           elevation: 0,
           selectedItemColor: AppColors.blue,
           unselectedItemColor: AppColors.textSecondary,
-          selectedLabelStyle: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600),
+          selectedLabelStyle: GoogleFonts.inter(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
           unselectedLabelStyle: GoogleFonts.inter(fontSize: 11),
           items: _navItems
-              .map((item) => BottomNavigationBarItem(
-                    icon: Icon(item.icon),
-                    activeIcon: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppColors.blueSoft,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Icon(item.activeIcon, color: AppColors.blue),
+              .map(
+                (item) => BottomNavigationBarItem(
+                  icon: Icon(item.icon),
+                  activeIcon: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 4,
                     ),
-                    label: item.label,
-                  ))
+                    decoration: BoxDecoration(
+                      color: AppColors.blueSoft,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Icon(item.activeIcon, color: AppColors.blue),
+                  ),
+                  label: item.label,
+                ),
+              )
               .toList(),
         ),
       ),
@@ -416,5 +479,9 @@ class _NavItem {
   final IconData icon;
   final IconData activeIcon;
   final String label;
-  const _NavItem({required this.icon, required this.activeIcon, required this.label});
+  const _NavItem({
+    required this.icon,
+    required this.activeIcon,
+    required this.label,
+  });
 }
