@@ -51,7 +51,7 @@ DROP POLICY IF EXISTS "Authenticated users can view projects" ON public.projects
 -- 2. Admin/Manager can see all.
 CREATE POLICY "Scoped project visibility" ON public.projects
 FOR SELECT TO authenticated USING (
-    role IN ('admin', 'manager') OR
+    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role IN ('admin', 'manager')) OR
     district = ANY(
         SELECT unnest(assigned_districts) 
         FROM public.users 

@@ -39,17 +39,31 @@ class HomeScreen extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Text(
-                          'Good morning, Inspector 👷',
-                          style: GoogleFonts.inter(
-                            fontSize: 13,
-                            color: Colors.white60,
-                            fontWeight: FontWeight.w500,
-                          ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Good morning,',
+                              style: GoogleFonts.inter(fontSize: 12, color: Colors.white60),
+                            ),
+                            Text(
+                              Supabase.instance.client.auth.currentUser?.email?.split('@')[0] ?? 'Inspector',
+                              style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                            ),
+                          ],
                         ),
                         const Spacer(),
-                        GestureDetector(
-                          onTap: () => syncProvider.syncNow(),
+                        IconButton(
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          icon: const Icon(Icons.logout, color: Colors.white54, size: 20),
+                          onPressed: () async {
+                            await Supabase.instance.client.auth.signOut();
+                            // Navigator.pushReplacement inside a StatelessWidget needs a context that works
+                          },
+                        ),
+                        const SizedBox(width: 16),
                         GestureDetector(
                           onTap: () => syncProvider.syncNow(),
                           child: Stack(
