@@ -16,22 +16,45 @@ class InspectionFormScreen extends StatefulWidget {
 
 class _InspectionFormScreenState extends State<InspectionFormScreen> {
   final _notesController = TextEditingController();
-  final _inspectorController = TextEditingController();
+  final _inspectorNameController = TextEditingController();
+  String? _inspectorId;
   File? _photo;
   bool _isSaving = false;
+  
+  double _overallProgress = 0;
+  double _ppeCompliance = 80;
+  String _visitType = 'Routine';
+  String _weather = 'Clear / Sunny';
+
+  final List<Map<String, dynamic>> _defects = [];
 
   final List<Map<String, dynamic>> _checklist = [
-    {'task': 'Verify Foundation Grade & Level', 'done': false},
-    {'task': 'Inspect Rebar Placement & Cover', 'done': false},
-    {'task': 'Check Safety Barriers & Fencing', 'done': false},
-    {'task': 'PPE Compliance (Hardhats, Vests)', 'done': false},
-    {'task': 'Scaffolding Stability Assessment', 'done': false},
-    {'task': 'Concrete Mix Batch Records', 'done': false},
-    {'task': 'Drainage & Water Management', 'done': false},
-    {'task': 'Site Cleanliness & Housekeeping', 'done': false},
+    {'task': 'Structural Integrity Verification', 'done': false},
+    {'task': 'Material Storage & Quality', 'done': false},
+    {'task': 'HSE Signs & Safety Barriers', 'done': false},
+    {'task': 'PPE Compliance Check', 'done': false},
+    {'task': 'Site Documentation Review', 'done': false},
+    {'task': 'Waste Management & Environment', 'done': false},
   ];
 
   int get _doneCount => _checklist.where((i) => i['done'] == true).length;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    final db = await DatabaseHelper.instance.database;
+    final profile = await db.query('user_profile', limit: 1);
+    if (profile.isNotEmpty) {
+      setState(() {
+        _inspectorId = profile.first['id'] as String;
+        _inspectorNameController.text = profile.first['full_name'] as String;
+      });
+    }
+  }
 
   Future<void> _pickPhoto() async {
     final picker = ImagePicker();
@@ -40,32 +63,67 @@ class _InspectionFormScreenState extends State<InspectionFormScreen> {
   }
 
   Future<void> _saveInspection() async {
+    if (_inspectorNameController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter inspector name')));
+      return;
+    }
+
     setState(() => _isSaving = true);
     final db = await DatabaseHelper.instance.database;
-    final id = DateTime.now().millisecondsSinceEpoch.toString();
-    await db.insert('inspections', {
-      'id': id,
+    final visitId = 'vst-${DateTime.now().millisecondsSinceEpoch}';
+    
+    // 1. Persist Master Record locally
+    await db.insert('visit_metadata', {
+      'id': visitId,
       'project_id': widget.projectId,
-      'inspection_date': DateTime.now().toIso8601String(),
-      'status': 'submitted',
+      'inspector_id': _inspectorId ?? 'unknown',
+      'date_time': DateTime.now().toIso8601String(),
+      'visit_type': _visitType,
+      'weather_condition': _weather,
+      'site_supervisor_present': 1,
+      'overall_progress': _overallProgress.toInt(),
+      'overall_status': _overallProgress > 70 ? 'Good' : 'Fair',
       'notes': _notesController.text,
       'sync_status': 'pending',
     });
+
+    // 2. Prepare payload for Transactional Sync (Framework RPC)
+    final payload = {
+      'project_id': widget.projectId,
+      'inspector_id': _inspectorId ?? 'unknown',
+      'date_time': DateTime.now().toIso8601String(),
+      'visit_type': _visitType,
+      'weather_condition': _weather,
+      'site_supervisor_present': true,
+      'overall_progress': _overallProgress.toInt(),
+      'overall_status': _overallProgress > 70 ? 'Good' : 'Fair',
+      'notes': _notesController.text,
+      'milestones': [], // Simplified for this demo
+      'issues': _defects,
+      'workforce_details': [
+        {'role': 'Total Staff', 'count': 10, 'gender': 'Mixed', 'is_youth': false}
+      ],
+      'materials': _checklist.where((c) => c['task'].toString().contains('Material')).map((c) => {
+        'item': c['task'],
+        'pass': c['done'],
+        'notes': ''
+      }).toList(),
+    };
+
+    // 3. Queue for Sync
     await db.insert('sync_queue', {
-      'entity_type': 'inspection',
-      'entity_id': id,
+      'entity_type': 'field_report', // Triggers the RPC in SyncProvider
+      'entity_id': visitId,
       'operation': 'INSERT',
-      'payload': jsonEncode({
-        'id': id,
-        'project_id': widget.projectId,
-        'status': 'Submitted',
-        'check_data': _checklist,
-        'created_at': DateTime.now().toIso8601String(),
-      }),
+      'payload': jsonEncode(payload),
       'created_at': DateTime.now().toIso8601String(),
     });
+
     setState(() => _isSaving = false);
-    if (mounted) Navigator.pop(context);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Inspection saved to sync queue')));
+      Navigator.pop(context);
+    }
   }
 
   @override
@@ -123,18 +181,93 @@ class _InspectionFormScreenState extends State<InspectionFormScreen> {
           ),
           const SizedBox(height: 20),
 
-          // ── Inspector Name ───────────────────────────────────────────
+          // ── Metadata Card ───────────────────────────────────────────
           _FormCard(
-            child: TextField(
-              controller: _inspectorController,
-              decoration: const InputDecoration(
-                labelText: 'Inspector Name',
-                prefixIcon: Icon(Icons.person_outline),
-                border: InputBorder.none,
-                filled: false,
-              ),
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                TextField(
+                  controller: _inspectorNameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Inspector Name',
+                    prefixIcon: Icon(Icons.person_outline),
+                    border: InputBorder.none,
+                    filled: false,
+                  ),
+                ),
+                const Divider(),
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _visitType,
+                          isExpanded: true,
+                          items: ['Routine', 'Follow-up', 'Final', 'Emergency']
+                              .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+                              .toList(),
+                          onChanged: (v) => setState(() => _visitType = v!),
+                        ),
+                      ),
+                    ),
+                    const VerticalDivider(),
+                    Expanded(
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _weather,
+                          isExpanded: true,
+                          items: ['Clear / Sunny', 'Rainy', 'Cloudy', 'Harmattan']
+                              .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+                              .toList(),
+                          onChanged: (v) => setState(() => _weather = v!),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
+          const SizedBox(height: 20),
+
+          // ── Progress & Safety Sliders ─────────────────────────────────
+          _SectionTitle('Progress & Safety'),
+          const SizedBox(height: 8),
+          _FormCard(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.between,
+                  children: [
+                    const Text('Overall Progress', style: TextStyle(fontWeight: FontWeight.bold)),
+                    Text('${_overallProgress.toInt()}%', style: const TextStyle(color: AppColors.blue, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                Slider(
+                  value: _overallProgress,
+                  max: 100,
+                  divisions: 20,
+                  onChanged: (v) => setState(() => _overallProgress = v),
+                ),
+                const Divider(),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.between,
+                  children: [
+                    const Text('PPE Compliance', style: TextStyle(fontWeight: FontWeight.bold)),
+                    Text('${_ppeCompliance.toInt()}%', style: const TextStyle(color: AppColors.blue, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                Slider(
+                  value: _ppeCompliance,
+                  max: 100,
+                  divisions: 10,
+                  onChanged: (v) => setState(() => _ppeCompliance = v),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
           const SizedBox(height: 12),
 
           // ── Checklist ────────────────────────────────────────────────
