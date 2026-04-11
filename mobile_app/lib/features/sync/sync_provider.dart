@@ -97,18 +97,39 @@ class SyncProvider with ChangeNotifier {
             'specializations': jsonEncode(profile['specializations']),
           }, conflictAlgorithm: ConflictAlgorithm.replace);
 
-          // 2. Fetch Assigned Projects
-          final projIds = await _supabase!.from('project_assignments').select('project_id').eq('user_id', userId);
-          final List<String> assignedIds = projIds.map((p) => p['project_id'].toString()).toList();
+          // 2. Clear local cache for a fresh pull
+          await db.delete('projects');
+          await db.delete('inspection_tasks');
 
-          // 3. Fetch Projects in my districts
+          // 3. Fetch Projects: (My Districts) OR (Directly Assigned)
           final districts = profile['assigned_districts'] as List<dynamic>;
-          final projectsResult = await _supabase!
+          
+          final assignedProjResponse = await _supabase!.from('project_assignments').select('project_id').eq('user_id', userId);
+          final List<String> assignedIds = (assignedProjResponse as List).map((p) => p['project_id'].toString()).toList();
+
+          // Fetch by District
+          final districtProjects = await _supabase!
               .from('projects')
               .select()
               .filter('district', 'in', districts);
           
-          for (var p in projectsResult) {
+          // Fetch by ID (Direct Assignments missing from districts)
+          final List<dynamic> allProjects = [...(districtProjects as List)];
+          if (assignedIds.isNotEmpty) {
+            final directProjects = await _supabase!
+                .from('projects')
+                .select()
+                .filter('id', 'in', assignedIds);
+            
+            // Add ones we don't already have
+            for (var p in directProjects) {
+              if (!allProjects.any((ap) => ap['id'] == p['id'])) {
+                allProjects.add(p);
+              }
+            }
+          }
+          
+          for (var p in allProjects) {
             await db.insert('projects', {
               'id': p['id'],
               'name': p['name'],
