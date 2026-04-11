@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../main.dart';
 import '../inspections/inspection_form_screen.dart';
+import '../inspections/multi_step_wizard.dart';
 import '../issues/issue_report_screen.dart';
 import 'timeline_screen.dart';
 import '../workforce/workforce_entry_screen.dart';
@@ -50,21 +51,19 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
 
   Future<void> _fetchProjects() async {
     try {
-      final data = await Supabase.instance.client
-          .from('projects')
-          .select()
-          .order('created_at', ascending: false);
+      final db = await DatabaseHelper.instance.database;
+      final localProjects = await db.query('projects', orderBy: 'created_at DESC');
 
-      if (data.isNotEmpty) {
-        final mapped = data.map((p) => {
+      if (localProjects.isNotEmpty) {
+        final mapped = localProjects.map((p) => {
               'id': p['id'],
               'name': p['name'],
               'status': p['status'].toString().toLowerCase(),
               'phase': p['status'] == 'Completed' ? 'Completed' : 'Phase 1: Tracking',
-              'progress': ((p['completion_percentage'] ?? 0) / 100).toDouble(),
+              'progress': 0.0, // Progress might need a separate fetch or join
               'inspections': 0,
               'issues': 0,
-              'location': p['district'],
+              'location': 'Assigned District',
             }).toList();
 
         if (mounted) {
@@ -74,11 +73,30 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
           });
         }
       } else {
-        if (mounted) {
-          setState(() {
-            _projects = List<Map<String, dynamic>>.from(_mockProjects);
-            _isLoading = false;
-          });
+        // Fallback to Supabase if local is empty (e.g., first run before sync)
+        final data = await Supabase.instance.client
+            .from('projects')
+            .select()
+            .order('created_at', ascending: false);
+
+        if (data.isNotEmpty) {
+          final mapped = data.map((p) => {
+                'id': p['id'],
+                'name': p['name'],
+                'status': p['status'].toString().toLowerCase(),
+                'phase': p['status'] == 'Completed' ? 'Completed' : 'Phase 1: Tracking',
+                'progress': ((p['completion_percentage'] ?? 0) / 100).toDouble(),
+                'inspections': 0,
+                'issues': 0,
+                'location': p['district'],
+              }).toList();
+
+          if (mounted) {
+            setState(() {
+              _projects = List<Map<String, dynamic>>.from(mapped);
+              _isLoading = false;
+            });
+          }
         }
       }
     } catch (e) {
@@ -267,10 +285,14 @@ class _ProjectCardState extends State<_ProjectCard> {
                 children: [
                   _ActionTile(
                     icon: Icons.fact_check,
-                    label: 'New Inspection Form',
+                    label: 'New Site Inspection Report',
                     iconColor: AppColors.blue,
                     onTap: () => Navigator.push(context, MaterialPageRoute(
-                      builder: (_) => InspectionFormScreen(projectId: p['id']),
+                      builder: (_) => MultiStepInspectionWizard(
+                        projectId: p['id'], 
+                        projectName: p['name'],
+                        projectType: p['phase'],
+                      ),
                     )),
                   ),
                   _ActionTile(

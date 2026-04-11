@@ -8,8 +8,20 @@ class SyncProvider with ChangeNotifier {
   bool get isSyncing => _isSyncing;
   DateTime? _lastSyncTime;
   DateTime? get lastSyncTime => _lastSyncTime;
-  
-  // Conditionally initialize supabase if configured
+
+  int _pendingCount = 0;
+  int get pendingCount => _pendingCount;
+
+  SyncProvider() {
+    updatePendingCount();
+  }
+
+  Future<void> updatePendingCount() async {
+    final db = await DatabaseHelper.instance.database;
+    final result = await db.rawQuery('SELECT COUNT(*) as count FROM sync_queue');
+    _pendingCount = (result.first['count'] as int?) ?? 0;
+    notifyListeners();
+  }
   SupabaseClient? get _supabase {
     try {
       return Supabase.instance.client;
@@ -26,6 +38,7 @@ class SyncProvider with ChangeNotifier {
 
     try {
       final db = await DatabaseHelper.instance.database;
+      // Get all pending items in the queue
       final queue = await db.query('sync_queue', orderBy: 'id ASC');
       
       for (final item in queue) {
@@ -35,10 +48,13 @@ class SyncProvider with ChangeNotifier {
         final payload = jsonDecode(item['payload'] as String);
 
         try {
-          // If internet and SDK connected -> Push to Cloud
           if (_supabase != null) {
-            if (operation == 'INSERT') {
-              // Map local entity types to cloud tables
+            if (type == 'field_report') {
+              // ── Transactional Sync via RPC ──
+              // This pushes the entire relational report (Workforce, Materials, etc.) in one go
+              await _supabase!.rpc('submit_field_report', params: {'report': payload});
+            } else if (operation == 'INSERT') {
+              // Legacy sync for simple tables
               String tableName = type == 'workforce_record' ? 'workforce_records' : 
                                 type == 'issue' ? 'issues' : 
                                 type == 'inspection' ? 'inspections' : type;
@@ -47,27 +63,78 @@ class SyncProvider with ChangeNotifier {
             }
           }
           
-          // Simulation delay for UX feedback when no db configured
-          if (_supabase == null) {
-            await Future.delayed(const Duration(milliseconds: 300));
-          }
+          // Bandwidth Awareness: Sequential processing with small delay to prevent monopolizing mobile data
+          await Future.delayed(const Duration(milliseconds: 500));
           
-          // Remove from local queue on verifiable success
+          // Remove from local queue on success
           await db.delete('sync_queue', where: 'id = ?', whereArgs: [id]);
           
-          // Update local sync status flag to reflect cloud mirror
-          if (type == 'workforce_record') {
-             await db.update('workforce_records', {'sync_status': 'synced'}, where: 'id = ?', whereArgs: [item['entity_id']]);
+          // Update local metadata status
+          if (type == 'field_report') {
+             await db.update('visit_metadata', {'sync_status': 'synced'}, where: 'id = ?', whereArgs: [item['entity_id']]);
           }
 
         } catch (e) {
           debugPrint('Sync failed for queue item $id: $e');
-          // Important: Stop execution on first failure to maintain reliable ordering
+          // Stop sync on failure to maintain sequence integrity
           break; 
         }
       }
 
       _lastSyncTime = DateTime.now();
+
+      // ── Download Sync: Fetch assigned profile, projects, and tasks ─────────
+      if (_supabase != null) {
+        final userId = _supabase!.auth.currentUser?.id;
+        if (userId != null) {
+          // 1. Fetch Profile
+          final profile = await _supabase!.from('users').select().eq('id', userId).single();
+          await db.insert('user_profile', {
+            'id': profile['id'],
+            'full_name': profile['full_name'],
+            'role': profile['role'],
+            'assigned_districts': jsonEncode(profile['assigned_districts']),
+            'specializations': jsonEncode(profile['specializations']),
+          }, conflictAlgorithm: ConflictAlgorithm.replace);
+
+          // 2. Fetch Assigned Projects
+          final projIds = await _supabase!.from('project_assignments').select('project_id').eq('user_id', userId);
+          final List<String> assignedIds = projIds.map((p) => p['project_id'].toString()).toList();
+
+          // 3. Fetch Projects in my districts
+          final districts = profile['assigned_districts'] as List<dynamic>;
+          final projectsResult = await _supabase!
+              .from('projects')
+              .select()
+              .filter('district', 'in', districts);
+          
+          for (var p in projectsResult) {
+            await db.insert('projects', {
+              'id': p['id'],
+              'name': p['name'],
+              'description': p['description'],
+              'status': p['status'],
+              'created_at': p['created_at'],
+            }, conflictAlgorithm: ConflictAlgorithm.replace);
+          }
+
+          // 4. Fetch Specific Tasks
+          final tasks = await _supabase!.from('inspection_tasks').select().eq('assignee_id', userId);
+          for (var t in tasks) {
+            await db.insert('inspection_tasks', {
+              'id': t['id'],
+              'project_id': t['project_id'],
+              'assignee_id': t['assignee_id'],
+              'title': t['title'],
+              'description': t['description'],
+              'deadline': t['deadline'],
+              'priority': t['priority'],
+              'status': t['status'],
+            }, conflictAlgorithm: ConflictAlgorithm.replace);
+          }
+        }
+      }
+
     } catch (e) {
       debugPrint('Sync critical error: $e');
     } finally {

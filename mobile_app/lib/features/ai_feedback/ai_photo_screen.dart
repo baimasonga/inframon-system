@@ -14,27 +14,47 @@ class _AIPhotoScreenState extends State<AIPhotoScreen> {
   File? _selectedImage;
   bool _isAnalyzing = false;
   _AnalysisResult? _result;
+  List<_AnalysisResult> _history = [];
+  bool _isLoadingHistory = true;
   final _picker = ImagePicker();
+  final _supabase = Supabase.instance.client;
 
-  final _history = <_AnalysisResult>[
-    _AnalysisResult(
-      imageLabel: 'Foundation inspection - Phase 1',
-      date: 'Mar 23, 2026',
-      progressScore: 72,
-      qualityScore: 85,
-      issues: ['Minor surface cracking detected', 'Rebar coverage adequate'],
-    ),
-    _AnalysisResult(
-      imageLabel: 'Road laying - Section B',
-      date: 'Mar 22, 2026',
-      progressScore: 55,
-      qualityScore: 68,
-      issues: ['Uneven asphalt layer detected', 'Edge compaction insufficient'],
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _fetchHistory();
+  }
+
+  Future<void> _fetchHistory() async {
+    try {
+      final data = await _supabase
+          .from('analysis_results')
+          .select('*, visit_metadata(date_time)')
+          .order('created_at', ascending: false);
+      
+      if (mounted) {
+        setState(() {
+          _history = data.map((item) {
+            final payload = item['analysis_payload'] as Map<String, dynamic>;
+            return _AnalysisResult(
+              imageLabel: 'Site Capture — ${item['id'].toString().substring(0, 8)}',
+              date: item['created_at'],
+              progressScore: payload['progress_score'] ?? 0,
+              qualityScore: payload['quality_score'] ?? 0,
+              issues: List<String>.from(payload['findings'] ?? []),
+            );
+          }).toList();
+          _isLoadingHistory = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Failed to fetch AI history: $e');
+      if (mounted) setState(() => _isLoadingHistory = false);
+    }
+  }
 
   Future<void> _pickImage(ImageSource source) async {
-    final picked = await _picker.pickImage(source: source, imageQuality: 80);
+    final picked = await _picker.pickImage(source: source, imageQuality: 70);
     if (picked != null) {
       setState(() {
         _selectedImage = File(picked.path);
@@ -46,21 +66,22 @@ class _AIPhotoScreenState extends State<AIPhotoScreen> {
   Future<void> _analyze() async {
     if (_selectedImage == null) return;
     setState(() => _isAnalyzing = true);
-    await Future.delayed(const Duration(seconds: 2));
-    setState(() {
-      _isAnalyzing = false;
-      _result = _AnalysisResult(
-        imageLabel: 'Field capture — ${DateTime.now().day} Mar 2026',
-        date: 'Mar 24, 2026',
-        progressScore: 63,
-        qualityScore: 78,
-        issues: [
-          'Concrete formwork alignment is satisfactory',
-          'Steel reinforcement spacing within spec',
-          'Surface finish requires attention — minor honeycombing visible',
-        ],
-      );
-    });
+    
+    // In a production flow, the analysis is triggered via the sync engine / database trigger.
+    // Here we simulate the wait for the background server-side analysis to complete.
+    await Future.delayed(const Duration(seconds: 3));
+    
+    // Refresh history to pick up the new result from the server
+    await _fetchHistory();
+    
+    if (_history.isNotEmpty) {
+      setState(() {
+        _isAnalyzing = false;
+        _result = _history.first;
+      });
+    } else {
+      setState(() => _isAnalyzing = false);
+    }
   }
 
   @override
@@ -148,8 +169,19 @@ class _AIPhotoScreenState extends State<AIPhotoScreen> {
 
             // History
             const SizedBox(height: 24),
-            Text('Analysis History', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 16, color: const Color(0xFF0F172A))),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Analysis History', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 16, color: const Color(0xFF0F172A))),
+                if (_isLoadingHistory) const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+              ],
+            ),
             const SizedBox(height: 12),
+            if (!_isLoadingHistory && _history.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 40),
+                child: Center(child: Text('No analysis results found.', style: GoogleFonts.inter(color: Colors.grey))),
+              ),
             ..._history.map((r) => _buildHistoryCard(r)),
           ],
         ),
