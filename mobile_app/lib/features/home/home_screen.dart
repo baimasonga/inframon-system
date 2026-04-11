@@ -50,23 +50,49 @@ class HomeScreen extends StatelessWidget {
                         const Spacer(),
                         GestureDetector(
                           onTap: () => syncProvider.syncNow(),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: Colors.white24),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.sync, size: 14, color: Colors.white70),
-                                const SizedBox(width: 6),
-                                Text(
-                                  syncProvider.isSyncing ? 'Syncing...' : 'Sync',
-                                  style: GoogleFonts.inter(fontSize: 12, color: Colors.white70),
+                        GestureDetector(
+                          onTap: () => syncProvider.syncNow(),
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: Colors.white24),
                                 ),
-                              ],
-                            ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.sync, size: 14, color: Colors.white70),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      syncProvider.isSyncing ? 'Syncing...' : 'Sync',
+                                      style: GoogleFonts.inter(fontSize: 12, color: Colors.white, fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (syncProvider.pendingCount > 0 && !syncProvider.isSyncing)
+                                Positioned(
+                                  top: -5,
+                                  right: -5,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: const BoxDecoration(
+                                      color: AppColors.danger,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                                    child: Center(
+                                      child: Text(
+                                        '${syncProvider.pendingCount}',
+                                        style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
                       ],
