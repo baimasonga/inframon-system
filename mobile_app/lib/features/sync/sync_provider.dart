@@ -139,7 +139,7 @@ class SyncProvider with ChangeNotifier {
       debugPrint('Sync critical error: $e');
     } finally {
       _isSyncing = false;
-      notifyListeners();
+      await updatePendingCount();
     }
   }
 }
