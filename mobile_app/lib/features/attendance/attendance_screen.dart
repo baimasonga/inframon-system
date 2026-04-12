@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 import 'dart:convert';
+import '../../main.dart';
 import '../../core/database/db_helper.dart';
 
 class AttendanceScreen extends StatefulWidget {
@@ -18,80 +19,197 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   String? _checkOutTime;
   String? _location;
   bool _loading = false;
+  String? _activeProjectId;
+  String? _activeProjectName;
 
-  final _logs = <_AttendanceLog>[
-    _AttendanceLog(date: 'Mar 23, 2026', checkIn: '07:52', checkOut: '17:10', hours: 9.3, project: 'Freetown Ring Road', verified: true),
-    _AttendanceLog(date: 'Mar 22, 2026', checkIn: '08:05', checkOut: '17:00', hours: 8.9, project: 'Freetown Ring Road', verified: true),
-    _AttendanceLog(date: 'Mar 21, 2026', checkIn: '08:20', checkOut: '16:50', hours: 8.5, project: 'Bonthe Bridge', verified: true),
-  ];
+  List<Map<String, dynamic>> _logs = [];
+  List<Map<String, dynamic>> _projects = [];
 
-  Future<void> _checkIn() async {
-    setState(() => _loading = true);
-    try {
-      final pos = await Geolocator.getCurrentPosition(locationSettings: const LocationSettings(accuracy: LocationAccuracy.high));
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    final db = await DatabaseHelper.instance.database;
+
+    // Load local attendance records
+    final records = await db.query(
+      'attendance_records',
+      orderBy: 'created_at DESC',
+      limit: 20,
+    );
+    // Load today's check-in state
+    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final todayRecord = records.where((r) {
+      final ci = r['check_in_time'] as String? ?? '';
+      return ci.startsWith(today) && (r['check_out_time'] == null || r['check_out_time'] == '');
+    }).toList();
+
+    // Load projects for picker
+    final projectRows = await db.query('projects', orderBy: 'name ASC');
+
+    if (mounted) {
       setState(() {
-        _checkedIn = true;
-        _checkInTime = DateFormat('HH:mm').format(DateTime.now());
-        _location = '${pos.latitude.toStringAsFixed(4)}, ${pos.longitude.toStringAsFixed(4)}';
-        _loading = false;
-      });
-    } catch (_) {
-      setState(() {
-        _checkedIn = true;
-        _checkInTime = DateFormat('HH:mm').format(DateTime.now());
-        _location = 'GPS unavailable';
-        _loading = false;
+        _logs = List<Map<String, dynamic>>.from(records);
+        _projects = List<Map<String, dynamic>>.from(projectRows);
+        if (todayRecord.isNotEmpty) {
+          _checkedIn = true;
+          final dt = DateTime.tryParse(todayRecord.first['check_in_time'] as String? ?? '');
+          _checkInTime = dt != null ? DateFormat('HH:mm').format(dt) : null;
+          _activeProjectId = todayRecord.first['project_id'] as String?;
+        }
       });
     }
   }
 
+  Future<void> _checkIn() async {
+    if (_activeProjectId == null && _projects.isNotEmpty) {
+      await _pickProject();
+      if (_activeProjectId == null) return;
+    }
+    setState(() => _loading = true);
+    try {
+      final pos = await Geolocator.getCurrentPosition(
+          locationSettings:
+              const LocationSettings(accuracy: LocationAccuracy.high));
+      _doCheckIn(pos.latitude, pos.longitude);
+    } catch (_) {
+      _doCheckIn(null, null);
+    }
+  }
+
+  Future<void> _pickProject() async {
+    final picked = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Select Project',
+            style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: _projects.isEmpty
+              ? const Text('No projects loaded. Please sync first.')
+              : ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _projects.length,
+                  itemBuilder: (_, i) => ListTile(
+                    title: Text(_projects[i]['name'] as String),
+                    subtitle: Text(_projects[i]['district'] as String? ?? ''),
+                    onTap: () => Navigator.pop(ctx, _projects[i]),
+                  ),
+                ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, null),
+              child: const Text('Cancel')),
+        ],
+      ),
+    );
+    if (picked != null && mounted) {
+      setState(() {
+        _activeProjectId = picked['id'] as String;
+        _activeProjectName = picked['name'] as String;
+      });
+    }
+  }
+
+  Future<void> _doCheckIn(double? lat, double? lng) async {
+    final db = await DatabaseHelper.instance.database;
+    final now = DateTime.now();
+    final id = now.millisecondsSinceEpoch.toString();
+    final profileRows = await db.query('user_profile', limit: 1);
+    final inspectorId = profileRows.isNotEmpty
+        ? profileRows.first['id'] as String?
+        : null;
+
+    await db.insert('attendance_records', {
+      'id': id,
+      'project_id': _activeProjectId ?? '',
+      'inspector_id': inspectorId ?? '',
+      'check_in_time': now.toIso8601String(),
+      'check_out_time': null,
+      'total_hours': null,
+      'gps_lat': lat,
+      'gps_lng': lng,
+      'verified_gps': lat != null ? 1 : 0,
+      'sync_status': 'pending',
+      'created_at': now.toIso8601String(),
+    });
+
+    if (mounted) {
+      setState(() {
+        _checkedIn = true;
+        _checkInTime = DateFormat('HH:mm').format(now);
+        _location = lat != null
+            ? '${lat.toStringAsFixed(4)}, ${lng!.toStringAsFixed(4)}'
+            : 'GPS unavailable';
+        _loading = false;
+      });
+    }
+    await _loadData();
+  }
+
   Future<void> _checkOut() async {
     setState(() => _loading = true);
-    await Future.delayed(const Duration(milliseconds: 500));
-    final now = DateTime.now();
-
     final db = await DatabaseHelper.instance.database;
-    final logId = DateTime.now().millisecondsSinceEpoch.toString();
-    final parts = _location?.split(', ') ?? [];
-    final lat = parts.isNotEmpty && parts[0] != 'GPS unavailable' ? double.tryParse(parts[0]) : null;
-    final lng = parts.length > 1 ? double.tryParse(parts[1]) : null;
-    
-    final start = DateFormat('HH:mm').parse(_checkInTime!);
-    final end = DateFormat('HH:mm').parse(DateFormat('HH:mm').format(now));
-    var hours = end.difference(start).inMinutes / 60.0;
-    if (hours < 0) hours = 0;
+    final now = DateTime.now();
+    final today = DateFormat('yyyy-MM-dd').format(now);
 
+    final todayRecords = await db.query(
+      'attendance_records',
+      where: "check_in_time LIKE ? AND (check_out_time IS NULL OR check_out_time = '')",
+      whereArgs: ['$today%'],
+    );
+    if (todayRecords.isEmpty) {
+      if (mounted) setState(() => _loading = false);
+      return;
+    }
+
+    final record = todayRecords.first;
+    final checkInDt =
+        DateTime.tryParse(record['check_in_time'] as String? ?? '') ?? now;
+    final totalHours =
+        now.difference(checkInDt).inMinutes / 60.0;
+
+    await db.update(
+      'attendance_records',
+      {'check_out_time': now.toIso8601String(), 'total_hours': totalHours},
+      where: 'id = ?',
+      whereArgs: [record['id']],
+    );
+
+    // Queue for sync
     await db.insert('sync_queue', {
       'entity_type': 'attendance_log',
-      'entity_id': logId,
+      'entity_id': record['id'],
       'operation': 'INSERT',
       'payload': jsonEncode({
-        'id': logId,
-        'project_id': 'proj-1', // Default assigned project in mock state
-        'check_in_time': DateTime(now.year, now.month, now.day, start.hour, start.minute).toIso8601String(),
+        'id': record['id'],
+        'project_id': record['project_id'],
+        'inspector_id': record['inspector_id'],
+        'check_in_time': record['check_in_time'],
         'check_out_time': now.toIso8601String(),
-        'gps_lat': lat,
-        'gps_lng': lng,
-        'verified_gps': _location != 'GPS unavailable',
-        'total_hours': double.parse(hours.toStringAsFixed(1)),
-        'created_at': now.toIso8601String(),
+        'gps_lat': record['gps_lat'],
+        'gps_lng': record['gps_lng'],
+        'verified_gps': record['verified_gps'] == 1,
+        'total_hours': double.parse(totalHours.toStringAsFixed(1)),
+        'created_at': record['created_at'],
       }),
       'created_at': now.toIso8601String(),
     });
 
-    setState(() {
-      _checkOutTime = DateFormat('HH:mm').format(now);
-      _checkedIn = false;
-      _loading = false;
-      _logs.insert(0, _AttendanceLog(
-        date: DateFormat('MMM d, yyyy').format(now),
-        checkIn: _checkInTime!,
-        checkOut: _checkOutTime!,
-        hours: double.parse(hours.toStringAsFixed(1)),
-        project: 'Active Site',
-        verified: _location != 'GPS unavailable',
-      ));
-    });
+    if (mounted) {
+      setState(() {
+        _checkOutTime = DateFormat('HH:mm').format(now);
+        _checkedIn = false;
+        _loading = false;
+        _activeProjectId = null;
+        _activeProjectName = null;
+      });
+    }
+    await _loadData();
   }
 
   @override
@@ -101,7 +219,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF0F172A),
         foregroundColor: Colors.white,
-        title: Text('Time & Attendance', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+        title: Text('Time & Attendance',
+            style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
         elevation: 0,
       ),
       body: SingleChildScrollView(
@@ -109,46 +228,85 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Status Card
+            // ── Check-In / Out Card ───────────────────────────────────────
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: _checkedIn ? [const Color(0xFF059669), const Color(0xFF10B981)] : [const Color(0xFF1E293B), const Color(0xFF334155)],
-                  begin: Alignment.topLeft, end: Alignment.bottomRight,
-                ),
+                color: _checkedIn
+                    ? const Color(0xFF0F172A)
+                    : Colors.white,
                 borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                    color: _checkedIn
+                        ? Colors.transparent
+                        : const Color(0xFFE2E8F0)),
               ),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Icon(_checkedIn ? Icons.location_on : Icons.location_off, color: Colors.white, size: 36),
-                  const SizedBox(height: 8),
-                  Text(_checkedIn ? 'You are Checked In' : 'Not Checked In', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 18, color: Colors.white)),
-                  if (_checkInTime != null) ...[
+                  Icon(
+                    _checkedIn
+                        ? Icons.location_on
+                        : Icons.location_off_outlined,
+                    size: 48,
+                    color: _checkedIn
+                        ? const Color(0xFF10B981)
+                        : const Color(0xFF94A3B8),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    _checkedIn ? 'On Site' : 'Not Checked In',
+                    style: GoogleFonts.inter(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: _checkedIn ? Colors.white : const Color(0xFF0F172A),
+                    ),
+                  ),
+                  if (_checkedIn && _activeProjectName != null) ...[
                     const SizedBox(height: 4),
-                    Text('Check-in: $_checkInTime  ·  GPS: $_location', style: GoogleFonts.inter(fontSize: 12, color: Colors.white70), textAlign: TextAlign.center),
+                    Text(
+                      _activeProjectName!,
+                      style: GoogleFonts.inter(
+                          fontSize: 13, color: Colors.white60),
+                    ),
                   ],
-                  const SizedBox(height: 16),
+                  if (_checkedIn && _checkInTime != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Since $_checkInTime',
+                      style: GoogleFonts.inter(
+                          fontSize: 13, color: Colors.white60),
+                    ),
+                  ],
+                  const SizedBox(height: 20),
                   SizedBox(
-                    width: 180,
+                    width: double.infinity,
+                    height: 48,
                     child: ElevatedButton(
-                      onPressed: _loading ? null : (_checkedIn ? _checkOut : _checkIn),
+                      onPressed: _loading
+                          ? null
+                          : (_checkedIn ? _checkOut : _checkIn),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: _checkedIn ? const Color(0xFF059669) : const Color(0xFF1E293B),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        elevation: 0,
+                        backgroundColor: _checkedIn
+                            ? const Color(0xFFEF4444)
+                            : const Color(0xFF1D6AE5),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14)),
                       ),
                       child: _loading
-                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                          : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                              Icon(_checkedIn ? Icons.logout : Icons.login, size: 18),
-                              const SizedBox(width: 6),
-                              Text(_checkedIn ? 'Check Out' : 'Check In', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 14)),
-                            ]),
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                  color: Colors.white, strokeWidth: 2),
+                            )
+                          : Text(
+                              _checkedIn ? 'Check Out' : 'Check In',
+                              style: GoogleFonts.inter(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white),
+                            ),
                     ),
                   ),
                 ],
@@ -156,52 +314,115 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             ),
 
             const SizedBox(height: 24),
-            Text('Attendance Log', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 16, color: const Color(0xFF0F172A))),
+            Text(
+              'ATTENDANCE HISTORY',
+              style: GoogleFonts.inter(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF94A3B8),
+                  letterSpacing: 1.0),
+            ),
             const SizedBox(height: 12),
-            ..._logs.map((log) => _buildLogCard(log)),
+
+            // ── Log List ─────────────────────────────────────────────────
+            if (_logs.isEmpty)
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(
+                    'No attendance records yet.',
+                    style: GoogleFonts.inter(color: const Color(0xFF94A3B8)),
+                  ),
+                ),
+              )
+            else
+              ..._logs.map((log) {
+                final ci = DateTime.tryParse(
+                    log['check_in_time'] as String? ?? '');
+                final co = log['check_out_time'] != null
+                    ? DateTime.tryParse(log['check_out_time'] as String)
+                    : null;
+                final verified = (log['verified_gps'] as int? ?? 0) == 1;
+                final hours = (log['total_hours'] as num?)?.toDouble();
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            ci != null
+                                ? DateFormat('MMM d, yyyy').format(ci)
+                                : '—',
+                            style: GoogleFonts.inter(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                                color: const Color(0xFF0F172A)),
+                          ),
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: verified
+                                  ? const Color(0xFFDCFCE7)
+                                  : const Color(0xFFFEF3C7),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              verified ? '✓ GPS Verified' : '⚠ Unverified',
+                              style: GoogleFonts.inter(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: verified
+                                      ? const Color(0xFF15803D)
+                                      : const Color(0xFFB45309)),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          _TimeChip(
+                              label: 'In',
+                              time: ci != null
+                                  ? DateFormat('HH:mm').format(ci)
+                                  : '—'),
+                          const SizedBox(width: 8),
+                          const Icon(Icons.arrow_forward,
+                              size: 14, color: Color(0xFF94A3B8)),
+                          const SizedBox(width: 8),
+                          _TimeChip(
+                              label: 'Out',
+                              time: co != null
+                                  ? DateFormat('HH:mm').format(co)
+                                  : 'Pending'),
+                          const Spacer(),
+                          if (hours != null)
+                            Text(
+                              '${hours.toStringAsFixed(1)}h',
+                              style: GoogleFonts.inter(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 16,
+                                  color: const Color(0xFF3B82F6)),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              }),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildLogCard(_AttendanceLog log) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(children: [
-            Text(log.date, style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13, color: const Color(0xFF0F172A))),
-            const Spacer(),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(color: log.verified ? const Color(0xFFDCFCE7) : const Color(0xFFFEF3C7), borderRadius: BorderRadius.circular(20)),
-              child: Text(log.verified ? '✓ GPS Verified' : '⚠ Unverified', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: log.verified ? const Color(0xFF15803D) : const Color(0xFFB45309))),
-            ),
-          ]),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              _TimeChip(label: 'In', time: log.checkIn),
-              const SizedBox(width: 8),
-              const Icon(Icons.arrow_forward, size: 14, color: Color(0xFF94A3B8)),
-              const SizedBox(width: 8),
-              _TimeChip(label: 'Out', time: log.checkOut),
-              const Spacer(),
-              Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                Text('${log.hours}h', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 16, color: const Color(0xFF3B82F6))),
-                Text(log.project, style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8))),
-              ]),
-            ],
-          ),
-        ],
       ),
     );
   }
@@ -215,18 +436,24 @@ class _TimeChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(8)),
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Text(label, style: GoogleFonts.inter(fontSize: 9, color: const Color(0xFF94A3B8), fontWeight: FontWeight.w600)),
-        Text(time, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: const Color(0xFF0F172A))),
-      ]),
+      decoration: BoxDecoration(
+          color: const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(8)),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label,
+              style: GoogleFonts.inter(
+                  fontSize: 9,
+                  color: const Color(0xFF94A3B8),
+                  fontWeight: FontWeight.w600)),
+          Text(time,
+              style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF0F172A))),
+        ],
+      ),
     );
   }
-}
-
-class _AttendanceLog {
-  final String date, checkIn, checkOut, project;
-  final double hours;
-  final bool verified;
-  const _AttendanceLog({required this.date, required this.checkIn, required this.checkOut, required this.hours, required this.project, required this.verified});
 }
