@@ -3,7 +3,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 import 'dart:convert';
-import '../../main.dart';
 import '../../core/database/db_helper.dart';
 
 class AttendanceScreen extends StatefulWidget {
@@ -16,8 +15,6 @@ class AttendanceScreen extends StatefulWidget {
 class _AttendanceScreenState extends State<AttendanceScreen> {
   bool _checkedIn = false;
   String? _checkInTime;
-  String? _checkOutTime;
-  String? _location;
   bool _loading = false;
   String? _activeProjectId;
   String? _activeProjectName;
