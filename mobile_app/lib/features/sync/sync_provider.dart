@@ -52,6 +52,12 @@ class SyncProvider with ChangeNotifier {
           if (_supabase != null) {
             if (type == 'field_report') {
               await _supabase!.rpc('submit_field_report', params: {'report': payload});
+            } else if (type == 'inspection_task_update') {
+                final taskId = payload['id'].toString();
+                final Map<String, dynamic> updateFields = {'status': payload['status']};
+                if (payload['gps_lat'] != null) updateFields['gps_lat'] = payload['gps_lat'];
+                if (payload['gps_lng'] != null) updateFields['gps_lng'] = payload['gps_lng'];
+                await _supabase!.from('inspection_tasks').update(updateFields).eq('id', taskId);
             } else if (operation == 'INSERT') {
               final String tableName;
               if (type == 'workforce_record') {
