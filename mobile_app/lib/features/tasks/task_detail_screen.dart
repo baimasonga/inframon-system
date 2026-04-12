@@ -8,6 +8,7 @@ import 'dart:io';
   import '../../main.dart';
   import '../../core/database/db_helper.dart';
   import '../sync/sync_provider.dart';
+  import '../inspections/multi_step_wizard.dart';
 
   class TaskDetailScreen extends StatefulWidget {
     final Map<String, dynamic> task;
@@ -26,6 +27,7 @@ import 'dart:io';
     bool _isSaving = false;
     bool _isCapturingGps = false;
     String? _projectName;
+    String _projectType = 'Infrastructure Project';
 
     @override
     void initState() {
@@ -52,7 +54,46 @@ import 'dart:io';
       final rows = await db.query('projects',
           where: 'id = ?', whereArgs: [projectId], limit: 1);
       if (rows.isNotEmpty && mounted) {
-        setState(() => _projectName = rows.first['name'] as String?);
+        final row = rows.first;
+        setState(() {
+          _projectName = row['name'] as String?;
+          final desc = (row['description'] as String? ?? '').toLowerCase();
+          if (desc.contains('road') || desc.contains('feeder')) {
+            _projectType = 'Feeder Road';
+          } else if (desc.contains('school') || desc.contains('education')) {
+            _projectType = 'School Building';
+          } else if (desc.contains('health') || desc.contains('clinic')) {
+            _projectType = 'Health Facility';
+          } else if (desc.contains('bridge')) {
+            _projectType = 'Bridge';
+          } else if (desc.contains('water') || desc.contains('borehole')) {
+            _projectType = 'Water & Sanitation';
+          }
+        });
+      }
+    }
+
+    Future<void> _launchInspection() async {
+      final projectId = widget.task['project_id'] as String?;
+      if (projectId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No project linked to this task')),
+        );
+        return;
+      }
+      final result = await Navigator.push<String>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => MultiStepInspectionWizard(
+            projectId: projectId,
+            projectName: _projectName ?? 'Project Inspection',
+            projectType: _projectType,
+            taskId: widget.task['id'] as String,
+          ),
+        ),
+      );
+      if (result == 'task_completed' && mounted) {
+        Navigator.pop(context, true);
       }
     }
 
@@ -398,7 +439,7 @@ import 'dart:io';
 
               const SizedBox(height: 36),
 
-              // ── Save button ────────────────────────────────────────────────
+              // ── Save status update button ───────────────────────────────────
               SizedBox(
                 width: double.infinity,
                 height: 52,
@@ -420,6 +461,77 @@ import 'dart:io';
                       : Text('Save & Sync Update',
                           style: GoogleFonts.inter(
                               fontWeight: FontWeight.bold, fontSize: 15)),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // ── Start Full Inspection divider ───────────────────────────────
+              Row(
+                children: [
+                  const Expanded(child: Divider()),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Text('or', style: GoogleFonts.inter(fontSize: 12, color: AppColors.textSecondary)),
+                  ),
+                  const Expanded(child: Divider()),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // ── Launch inspection wizard button ─────────────────────────────
+              Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF1D6AE5), Color(0xFF0A3260)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF1D6AE5).withValues(alpha: 0.35),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: widget.task['project_id'] == null ? null : _launchInspection,
+                    borderRadius: BorderRadius.circular(12),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.assignment_add, color: Colors.white, size: 22),
+                          const SizedBox(width: 10),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Start Full Site Inspection',
+                                style: GoogleFonts.inter(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15),
+                              ),
+                              Text(
+                                'Opens 7-step wizard — auto-completes this task',
+                                style: GoogleFonts.inter(
+                                    color: Colors.white70, fontSize: 11),
+                              ),
+                            ],
+                          ),
+                          const Spacer(),
+                          const Icon(Icons.chevron_right, color: Colors.white70),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 20),
