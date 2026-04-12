@@ -263,7 +263,7 @@ class _InspectionFormScreenState extends State<InspectionFormScreen> {
             child: Column(
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.between,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text('Overall Progress', style: TextStyle(fontWeight: FontWeight.bold)),
                     Text('${_overallProgress.toInt()}%', style: const TextStyle(color: AppColors.blue, fontWeight: FontWeight.bold)),
@@ -277,7 +277,7 @@ class _InspectionFormScreenState extends State<InspectionFormScreen> {
                 ),
                 const Divider(),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.between,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text('PPE Compliance', style: TextStyle(fontWeight: FontWeight.bold)),
                     Text('${_ppeCompliance.toInt()}%', style: const TextStyle(color: AppColors.blue, fontWeight: FontWeight.bold)),
