@@ -97,7 +97,7 @@ class _TaskCard extends StatelessWidget {
                          task['priority'] == 'Urgent' ? Colors.deepPurple : AppColors.amber;
     
     return Card(
-      margin: const EdgeInsets.bottom(12),
+      margin: EdgeInsets.only(bottom: 12),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
