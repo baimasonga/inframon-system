@@ -145,8 +145,7 @@ import 'package:flutter/material.dart';
               ),
               const SizedBox(height: 8),
               Text(
-                'Pull down to refresh or tap sync
-to download the latest assignments.',
+                'Pull down to refresh or tap sync\nto download the latest assignments.',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
                     fontSize: 14, color: AppColors.textSecondary),
