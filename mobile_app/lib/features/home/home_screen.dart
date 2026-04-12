@@ -1,13 +1,69 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../main.dart';
+import '../../core/database/db_helper.dart';
 import '../sync/sync_provider.dart';
-import '../projects/timeline_screen.dart';
+import '../projects/projects_list_screen.dart';
 import '../inspections/inspection_form_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  String _displayName = 'Inspector';
+  int _pendingVisits = 0;
+  int _pendingIssues = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLocalStats();
+  }
+
+  Future<void> _loadLocalStats() async {
+    final db = await DatabaseHelper.instance.database;
+
+    final profile = await db.query('user_profile', limit: 1);
+    if (profile.isNotEmpty && mounted) {
+      setState(() {
+        _displayName = profile.first['full_name'] as String? ?? 'Inspector';
+      });
+    } else {
+      final email = Supabase.instance.client.auth.currentUser?.email ?? '';
+      if (mounted) {
+        setState(() {
+          _displayName = email.contains('@') ? email.split('@')[0] : 'Inspector';
+        });
+      }
+    }
+
+    final visitsResult = await db.rawQuery(
+      "SELECT COUNT(*) as c FROM visit_metadata WHERE sync_status = 'pending'",
+    );
+    final issuesResult = await db.rawQuery(
+      "SELECT COUNT(*) as c FROM issues WHERE sync_status = 'pending'",
+    );
+
+    if (mounted) {
+      setState(() {
+        _pendingVisits = (visitsResult.first['c'] as int?) ?? 0;
+        _pendingIssues = (issuesResult.first['c'] as int?) ?? 0;
+      });
+    }
+  }
+
+  Future<void> _signOut(BuildContext context) async {
+    await Supabase.instance.client.auth.signOut();
+    if (context.mounted) {
+      Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -17,7 +73,6 @@ class HomeScreen extends StatelessWidget {
       backgroundColor: AppColors.surface,
       body: CustomScrollView(
         slivers: [
-          // ── App Bar ──────────────────────────────────────────────────────
           SliverAppBar(
             expandedHeight: 160,
             floating: false,
@@ -45,11 +100,15 @@ class HomeScreen extends StatelessWidget {
                           children: [
                             Text(
                               'Good morning,',
-                              style: GoogleFonts.inter(fontSize: 12, color: Colors.white60),
+                              style: GoogleFonts.inter(
+                                  fontSize: 12, color: Colors.white60),
                             ),
                             Text(
-                              Supabase.instance.client.auth.currentUser?.email?.split('@')[0] ?? 'Inspector',
-                              style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                              _displayName,
+                              style: GoogleFonts.inter(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white),
                             ),
                           ],
                         ),
@@ -57,20 +116,23 @@ class HomeScreen extends StatelessWidget {
                         IconButton(
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(),
-                          icon: const Icon(Icons.logout, color: Colors.white54, size: 20),
-                          onPressed: () async {
-                            await Supabase.instance.client.auth.signOut();
-                            // Navigator.pushReplacement inside a StatelessWidget needs a context that works
-                          },
+                          icon: const Icon(Icons.logout,
+                              color: Colors.white54, size: 20),
+                          tooltip: 'Sign Out',
+                          onPressed: () => _signOut(context),
                         ),
                         const SizedBox(width: 16),
                         GestureDetector(
-                          onTap: () => syncProvider.syncNow(),
+                          onTap: () async {
+                            await syncProvider.syncNow();
+                            if (mounted) _loadLocalStats();
+                          },
                           child: Stack(
                             clipBehavior: Clip.none,
                             children: [
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 8),
                                 decoration: BoxDecoration(
                                   color: Colors.white.withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(20),
@@ -78,31 +140,45 @@ class HomeScreen extends StatelessWidget {
                                 ),
                                 child: Row(
                                   children: [
-                                    const Icon(Icons.sync, size: 14, color: Colors.white70),
+                                    syncProvider.isSyncing
+                                        ? const SizedBox(
+                                            width: 14,
+                                            height: 14,
+                                            child: CircularProgressIndicator(
+                                                color: Colors.white70,
+                                                strokeWidth: 2),
+                                          )
+                                        : const Icon(Icons.sync,
+                                            size: 14, color: Colors.white70),
                                     const SizedBox(width: 8),
                                     Text(
-                                      syncProvider.isSyncing ? 'Syncing...' : 'Sync',
-                                      style: GoogleFonts.inter(fontSize: 12, color: Colors.white, fontWeight: FontWeight.bold),
+                                      syncProvider.isSyncing
+                                          ? 'Syncing...'
+                                          : 'Sync',
+                                      style: GoogleFonts.inter(
+                                          fontSize: 12,
+                                          color: Colors.white70,
+                                          fontWeight: FontWeight.w600),
                                     ),
                                   ],
                                 ),
                               ),
-                              if (syncProvider.pendingCount > 0 && !syncProvider.isSyncing)
+                              if (syncProvider.pendingCount > 0)
                                 Positioned(
-                                  top: -5,
-                                  right: -5,
+                                  top: -6,
+                                  right: -6,
                                   child: Container(
                                     padding: const EdgeInsets.all(4),
                                     decoration: const BoxDecoration(
-                                      color: AppColors.danger,
+                                      color: AppColors.amber,
                                       shape: BoxShape.circle,
                                     ),
-                                    constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
-                                    child: Center(
-                                      child: Text(
-                                        '${syncProvider.pendingCount}',
-                                        style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold),
-                                      ),
+                                    child: Text(
+                                      '${syncProvider.pendingCount}',
+                                      style: GoogleFonts.inter(
+                                          fontSize: 9,
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold),
                                     ),
                                   ),
                                 ),
@@ -110,16 +186,6 @@ class HomeScreen extends StatelessWidget {
                           ),
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Field Dashboard',
-                      style: GoogleFonts.inter(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        letterSpacing: -0.5,
-                      ),
                     ),
                   ],
                 ),
@@ -129,122 +195,112 @@ class HomeScreen extends StatelessWidget {
 
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ── Stats Row ───────────────────────────────────────────
+                  // ── Pending Uploads Banner ───────────────────────────────
+                  if (syncProvider.pendingCount > 0)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 20),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF3C7),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFFBBF24)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.cloud_upload_outlined,
+                              color: Color(0xFFB45309), size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              '${syncProvider.pendingCount} item(s) pending upload. Tap Sync when connected.',
+                              style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  color: const Color(0xFF92400E),
+                                  fontWeight: FontWeight.w500),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  // ── Summary Cards ────────────────────────────────────────
                   Row(
                     children: [
-                      Expanded(
-                        child: _StatCard(
-                          label: 'Inspections',
-                          value: '14',
-                          icon: Icons.fact_check_outlined,
-                          color: AppColors.blue,
-                          bgColor: AppColors.blueSoft,
-                        ),
+                      _StatCard(
+                        icon: Icons.pending_actions_outlined,
+                        label: 'Pending Visits',
+                        value: '$_pendingVisits',
+                        color: AppColors.blue,
                       ),
                       const SizedBox(width: 12),
-                      Expanded(
-                        child: _StatCard(
-                          label: 'Open Issues',
-                          value: '3',
-                          icon: Icons.warning_amber_outlined,
-                          color: AppColors.danger,
-                          bgColor: const Color(0xFFFEF2F2),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _StatCard(
-                          label: 'Projects',
-                          value: '2',
-                          icon: Icons.folder_outlined,
-                          color: AppColors.success,
-                          bgColor: const Color(0xFFECFDF5),
-                        ),
+                      _StatCard(
+                        icon: Icons.flag_outlined,
+                        label: 'Unsync Issues',
+                        value: '$_pendingIssues',
+                        color: AppColors.danger,
                       ),
                     ],
                   ),
-                  const SizedBox(height: 24),
 
-                  // ── Recent Inspections ──────────────────────────────────
-                  _SectionHeader(
-                    title: 'Recent Inspections',
-                    onTap: () {},
+                  const SizedBox(height: 28),
+                  Text(
+                    'QUICK ACTIONS',
+                    style: GoogleFonts.inter(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textSecondary,
+                        letterSpacing: 1.0),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // ── Quick Actions ────────────────────────────────────────
+                  _QuickActionCard(
+                    icon: Icons.fact_check_outlined,
+                    label: 'New Site Inspection',
+                    color: AppColors.blue,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const ProjectsListScreen()),
+                    ),
                   ),
                   const SizedBox(height: 12),
-                  _InspectionTile(
-                    projectName: 'Highway Renovation A1',
-                    date: 'Today, 08:30 AM',
-                    itemsChecked: 6,
-                    total: 8,
-                    onTap: () => Navigator.push(context, MaterialPageRoute(
-                      builder: (_) => const InspectionFormScreen(projectId: 'proj-1'),
-                    )),
+                  _QuickActionCard(
+                    icon: Icons.report_problem_outlined,
+                    label: 'Report a Site Issue',
+                    color: AppColors.danger,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const ProjectsListScreen()),
+                    ),
                   ),
-                  const SizedBox(height: 8),
-                  _InspectionTile(
-                    projectName: 'City Hall Extension',
-                    date: 'Yesterday, 02:15 PM',
-                    itemsChecked: 8,
-                    total: 8,
-                    onTap: () {},
-                  ),
-                  const SizedBox(height: 24),
-
-                  // ── Active Issues ───────────────────────────────────────
-                  _SectionHeader(title: 'Active Issues', onTap: () {}),
                   const SizedBox(height: 12),
-                  _IssueTile(
-                    title: 'Scaffolding collapse hazard',
-                    project: 'Highway A1, Sec 4',
-                    severity: 'critical',
+                  _QuickActionCard(
+                    icon: Icons.sync_outlined,
+                    label: 'Sync Data to Dashboard',
+                    color: AppColors.success,
+                    onTap: () async {
+                      await syncProvider.syncNow();
+                      if (mounted) _loadLocalStats();
+                    },
                   ),
-                  const SizedBox(height: 8),
-                  _IssueTile(
-                    title: 'Unauthorized workers on site',
-                    project: 'City Hall, Floor 2',
-                    severity: 'high',
-                  ),
-                  const SizedBox(height: 8),
-                  _IssueTile(
-                    title: 'Missing PPE – hardhats',
-                    project: 'Bridge Foundation',
-                    severity: 'medium',
-                  ),
-                  const SizedBox(height: 24),
 
-                  // ── Quick Actions ───────────────────────────────────────
-                  _SectionHeader(title: 'Quick Actions', onTap: null),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _QuickActionCard(
-                          icon: Icons.fact_check,
-                          label: 'New\nInspection',
-                          color: AppColors.blue,
-                          onTap: () => Navigator.push(context, MaterialPageRoute(
-                            builder: (_) => const InspectionFormScreen(projectId: 'proj-1'),
-                          )),
-                        ),
+                  if (syncProvider.lastSyncTime != null) ...[
+                    const SizedBox(height: 20),
+                    Center(
+                      child: Text(
+                        'Last sync: ${_formatTime(syncProvider.lastSyncTime!)}',
+                        style: GoogleFonts.inter(
+                            fontSize: 11, color: AppColors.textSecondary),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _QuickActionCard(
-                          icon: Icons.timeline,
-                          label: 'View\nTimeline',
-                          color: AppColors.amber,
-                          onTap: () => Navigator.push(context, MaterialPageRoute(
-                            builder: (_) => const TimelineScreen(projectId: 'proj-1'),
-                          )),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 80),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -253,222 +309,58 @@ class HomeScreen extends StatelessWidget {
       ),
     );
   }
-}
 
-// ── Sub-widgets ───────────────────────────────────────────────────────────────
+  String _formatTime(DateTime t) {
+    final diff = DateTime.now().difference(t);
+    if (diff.inMinutes < 1) return 'just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    return '${diff.inDays}d ago';
+  }
+}
 
 class _StatCard extends StatelessWidget {
+  final IconData icon;
   final String label;
   final String value;
-  final IconData icon;
   final Color color;
-  final Color bgColor;
 
   const _StatCard({
+    required this.icon,
     required this.label,
     required this.value,
-    required this.icon,
     required this.color,
-    required this.bgColor,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(10)),
-            child: Icon(icon, size: 18, color: color),
-          ),
-          const SizedBox(height: 10),
-          Text(value,
-              style: GoogleFonts.inter(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-          Text(label,
-              style: GoogleFonts.inter(fontSize: 11, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
-        ],
-      ),
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  final String title;
-  final VoidCallback? onTap;
-  const _SectionHeader({required this.title, this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Text(title,
-            style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-        const Spacer(),
-        if (onTap != null)
-          GestureDetector(
-            onTap: onTap,
-            child: Text('See all',
-                style: GoogleFonts.inter(fontSize: 13, color: AppColors.blue, fontWeight: FontWeight.w600)),
-          ),
-      ],
-    );
-  }
-}
-
-class _InspectionTile extends StatelessWidget {
-  final String projectName;
-  final String date;
-  final int itemsChecked;
-  final int total;
-  final VoidCallback onTap;
-
-  const _InspectionTile({
-    required this.projectName,
-    required this.date,
-    required this.itemsChecked,
-    required this.total,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final pct = itemsChecked / total;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+    return Expanded(
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.border),
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
           children: [
-            Row(
+            Icon(icon, color: color, size: 28),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.blueSoft,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.fact_check, color: AppColors.blue, size: 18),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(projectName,
-                          style:
-                              GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                      const SizedBox(height: 2),
-                      Text(date,
-                          style: GoogleFonts.inter(fontSize: 12, color: AppColors.textSecondary)),
-                    ],
-                  ),
-                ),
-                Text('$itemsChecked/$total',
+                Text(value,
                     style: GoogleFonts.inter(
-                        fontSize: 13, color: AppColors.blue, fontWeight: FontWeight.bold)),
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: color)),
+                Text(label,
+                    style: GoogleFonts.inter(
+                        fontSize: 11, color: AppColors.textSecondary)),
               ],
-            ),
-            const SizedBox(height: 12),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: LinearProgressIndicator(
-                value: pct,
-                backgroundColor: AppColors.blueSoft,
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  pct == 1.0 ? AppColors.success : AppColors.blue,
-                ),
-                minHeight: 6,
-              ),
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _IssueTile extends StatelessWidget {
-  final String title;
-  final String project;
-  final String severity;
-
-  const _IssueTile({required this.title, required this.project, required this.severity});
-
-  @override
-  Widget build(BuildContext context) {
-    Color chipColor;
-    Color chipBg;
-    String label;
-    switch (severity) {
-      case 'critical':
-        chipColor = AppColors.danger;
-        chipBg = const Color(0xFFFEF2F2);
-        label = 'Critical';
-        break;
-      case 'high':
-        chipColor = const Color(0xFFEA580C);
-        chipBg = const Color(0xFFFFF7ED);
-        label = 'High';
-        break;
-      default:
-        chipColor = AppColors.amber;
-        chipBg = const Color(0xFFFFFBEB);
-        label = 'Medium';
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 4,
-            height: 42,
-            decoration: BoxDecoration(
-              color: chipColor,
-              borderRadius: BorderRadius.circular(4),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    style: GoogleFonts.inter(
-                        fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                const SizedBox(height: 3),
-                Text(project, style: GoogleFonts.inter(fontSize: 12, color: AppColors.textSecondary)),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(color: chipBg, borderRadius: BorderRadius.circular(20)),
-            child: Text(label,
-                style: GoogleFonts.inter(
-                    fontSize: 11, fontWeight: FontWeight.bold, color: chipColor)),
-          ),
-        ],
       ),
     );
   }
@@ -511,7 +403,10 @@ class _QuickActionCard extends StatelessWidget {
             const SizedBox(width: 12),
             Text(label,
                 style: GoogleFonts.inter(
-                    fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white, height: 1.3)),
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    height: 1.3)),
           ],
         ),
       ),
