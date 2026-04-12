@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../main.dart';
 import '../../core/database/db_helper.dart';
@@ -107,6 +108,29 @@ class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
 
   Future<void> _saveFinalReport() async {
     setState(() => _isSaving = true);
+
+    // Fetch real GPS before building payload
+    double gpsLat = 8.484;
+    double gpsLng = -13.234;
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (serviceEnabled) {
+        LocationPermission perm = await Geolocator.checkPermission();
+        if (perm == LocationPermission.denied) {
+          perm = await Geolocator.requestPermission();
+        }
+        if (perm == LocationPermission.whileInUse || perm == LocationPermission.always) {
+          final pos = await Geolocator.getCurrentPosition(
+            locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+          );
+          gpsLat = pos.latitude;
+          gpsLng = pos.longitude;
+        }
+      }
+    } catch (e) {
+      debugPrint('GPS fetch failed, using default: $e');
+    }
+
     final db = await DatabaseHelper.instance.database;
     final visitId = DateTime.now().millisecondsSinceEpoch.toString();
 
@@ -122,8 +146,8 @@ class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
       'overall_status': _overallStatus,
       'recommendation': _recommendation,
       'notes': _notesController.text,
-      'gps_lat': 8.484, // Simplified GPS for demo
-      'gps_lng': -13.234,
+      'gps_lat': gpsLat,
+      'gps_lng': gpsLng,
       'milestones': _milestones
           .map(
             (m) => {
@@ -185,8 +209,8 @@ class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
       'overall_status': _overallStatus,
       'recommendation': _recommendation,
       'notes': _notesController.text,
-      'gps_lat': 8.484,
-      'gps_lng': -13.234,
+      'gps_lat': gpsLat,
+      'gps_lng': gpsLng,
       'sync_status': 'pending',
     });
 
