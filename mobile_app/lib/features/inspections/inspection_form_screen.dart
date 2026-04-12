@@ -29,12 +29,13 @@ class _InspectionFormScreenState extends State<InspectionFormScreen> {
   final List<Map<String, dynamic>> _defects = [];
 
   final List<Map<String, dynamic>> _checklist = [
-    {'task': 'Structural Integrity Verification', 'done': false},
-    {'task': 'Material Storage & Quality', 'done': false},
-    {'task': 'HSE Signs & Safety Barriers', 'done': false},
-    {'task': 'PPE Compliance Check', 'done': false},
-    {'task': 'Site Documentation Review', 'done': false},
-    {'task': 'Waste Management & Environment', 'done': false},
+    {'task': 'Foundation/Structural Integrity', 'done': false, 'category': 'Structural'},
+    {'task': 'Concrete Slump/Cube Tests', 'done': false, 'category': 'Materials'},
+    {'task': 'Material Storage & Spoilage', 'done': false, 'category': 'Materials'},
+    {'task': 'HSE Signage & Perimeter Scaffolding', 'done': false, 'category': 'HSE'},
+    {'task': 'PPE Compliance (Helmet/Vests)', 'done': false, 'category': 'HSE'},
+    {'task': 'Approved Plans on Site', 'done': false, 'category': 'Compliance'},
+    {'task': 'Waste Disposal & Environment', 'done': false, 'category': 'HSE'},
   ];
 
   int get _doneCount => _checklist.where((i) => i['done'] == true).length;
@@ -98,16 +99,29 @@ class _InspectionFormScreenState extends State<InspectionFormScreen> {
       'overall_progress': _overallProgress.toInt(),
       'overall_status': _overallProgress > 70 ? 'Good' : 'Fair',
       'notes': _notesController.text,
-      'milestones': [], // Simplified for this demo
+      'milestones': [], 
       'issues': _defects,
-      'workforce_details': [
-        {'role': 'Total Staff', 'count': 10, 'gender': 'Mixed', 'is_youth': false}
-      ],
-      'materials': _checklist.where((c) => c['task'].toString().contains('Material')).map((c) => {
-        'item': c['task'],
+      'quality_checks': _checklist.map((c) => {
+        'check_item': c['task'],
+        'category': c['category'],
         'pass': c['done'],
         'notes': ''
       }).toList(),
+      'hse_record': {
+        'ppe_usage_pct': _ppeCompliance.toInt(),
+        'waste_management': _checklist.firstWhere((c) => c['task'].contains('Waste'))['done'] ? 'Verified Good' : 'Requires Action',
+        'environmental_protection': 'Standard Precautions'
+      },
+      'materials': _checklist.where((c) => c['category'] == 'Materials').map((c) => {
+        'item': c['task'],
+        'pass': c['done'],
+        'notes': 'Verified on-site'
+      }).toList(),
+      'compliance': {
+        'approved_drawings_on_site': _checklist.firstWhere((c) => c['category'] == 'Compliance')['done'],
+        'work_permits_valid': true,
+        'previous_issues_resolved': false
+      }
     };
 
     // 3. Queue for Sync
