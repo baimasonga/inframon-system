@@ -24,9 +24,9 @@ void main() async {
   );
 
   await Supabase.initialize(
-    url: 'https://blfdifimwsctgqpcsdgm.supabase.co',
+    url: 'https://xmkbgqniylgrcudqmkca.supabase.co',
     anonKey:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJsZmRpZmltd3NjdGdxcGNzZGdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzMDk0NzAsImV4cCI6MjA4OTg4NTQ3MH0.ohNhyiz9wuEwJKCm2CuHWm7xtP7uOhPCFKC1ddB_zkE',
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhta2JncW5peWxncmN1ZHFta2NhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MDIzMTcsImV4cCI6MjA5MTQ3ODMxN30.trAxiQ4n-zJrekxNSx6BmQcN9pY-NwFsmyUDyzorzbI',
   );
 
   await DatabaseHelper.instance.database;
