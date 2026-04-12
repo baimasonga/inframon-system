@@ -19,24 +19,25 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _createDB,
+      onUpgrade: _onUpgrade,
     );
   }
 
   Future _createDB(Database db, int version) async {
-    // Projects table
     await db.execute('''
     CREATE TABLE projects (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       description TEXT,
       status TEXT,
+      district TEXT,
+      completion_percentage INTEGER DEFAULT 0,
       created_at TEXT
     )
     ''');
 
-    // Visit Metadata (The master record)
     await db.execute('''
     CREATE TABLE visit_metadata (
       id TEXT PRIMARY KEY,
@@ -56,7 +57,6 @@ class DatabaseHelper {
     )
     ''');
 
-    // Milestones Log
     await db.execute('''
     CREATE TABLE milestone_logs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -69,7 +69,6 @@ class DatabaseHelper {
     )
     ''');
 
-    // Workforce Records
     await db.execute('''
     CREATE TABLE workforce_records (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -81,7 +80,6 @@ class DatabaseHelper {
     )
     ''');
 
-    // Materials Records
     await db.execute('''
     CREATE TABLE materials_records (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -92,7 +90,6 @@ class DatabaseHelper {
     )
     ''');
 
-    // Defect Logs
     await db.execute('''
     CREATE TABLE defect_logs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -106,7 +103,37 @@ class DatabaseHelper {
     )
     ''');
 
-    // User Profile (for scoping)
+    await db.execute('''
+    CREATE TABLE issues (
+      id TEXT PRIMARY KEY,
+      project_id TEXT,
+      title TEXT,
+      description TEXT,
+      severity TEXT,
+      status TEXT DEFAULT 'open',
+      location_lat REAL,
+      location_lng REAL,
+      sync_status TEXT DEFAULT 'pending',
+      created_at TEXT
+    )
+    ''');
+
+    await db.execute('''
+    CREATE TABLE attendance_records (
+      id TEXT PRIMARY KEY,
+      project_id TEXT,
+      inspector_id TEXT,
+      check_in_time TEXT,
+      check_out_time TEXT,
+      total_hours REAL,
+      gps_lat REAL,
+      gps_lng REAL,
+      verified_gps INTEGER DEFAULT 0,
+      sync_status TEXT DEFAULT 'pending',
+      created_at TEXT
+    )
+    ''');
+
     await db.execute('''
     CREATE TABLE user_profile (
       id TEXT PRIMARY KEY,
@@ -117,7 +144,6 @@ class DatabaseHelper {
     )
     ''');
 
-    // Project Assignments (Local Cache)
     await db.execute('''
     CREATE TABLE project_assignments (
       id TEXT PRIMARY KEY,
@@ -127,7 +153,6 @@ class DatabaseHelper {
     )
     ''');
 
-    // Inspection Tasks (Local Cache)
     await db.execute('''
     CREATE TABLE inspection_tasks (
       id TEXT PRIMARY KEY,
@@ -141,7 +166,6 @@ class DatabaseHelper {
     )
     ''');
 
-    // Existing Sync Queue (Legacy Support)
     await db.execute('''
     CREATE TABLE sync_queue (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -154,8 +178,43 @@ class DatabaseHelper {
     ''');
   }
 
-  Future<void> close() async {
-    final db = await instance.database;
-    db.close();
+  Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('''
+      CREATE TABLE IF NOT EXISTS issues (
+        id TEXT PRIMARY KEY,
+        project_id TEXT,
+        title TEXT,
+        description TEXT,
+        severity TEXT,
+        status TEXT DEFAULT 'open',
+        location_lat REAL,
+        location_lng REAL,
+        sync_status TEXT DEFAULT 'pending',
+        created_at TEXT
+      )
+      ''');
+      await db.execute('''
+      CREATE TABLE IF NOT EXISTS attendance_records (
+        id TEXT PRIMARY KEY,
+        project_id TEXT,
+        inspector_id TEXT,
+        check_in_time TEXT,
+        check_out_time TEXT,
+        total_hours REAL,
+        gps_lat REAL,
+        gps_lng REAL,
+        verified_gps INTEGER DEFAULT 0,
+        sync_status TEXT DEFAULT 'pending',
+        created_at TEXT
+      )
+      ''');
+      await db.execute(
+        'ALTER TABLE projects ADD COLUMN district TEXT',
+      );
+      await db.execute(
+        'ALTER TABLE projects ADD COLUMN completion_percentage INTEGER DEFAULT 0',
+      );
+    }
   }
 }
