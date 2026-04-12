@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
   import 'package:flutter/foundation.dart';
   import 'package:sqflite/sqflite.dart';
   import 'package:supabase_flutter/supabase_flutter.dart';
@@ -199,6 +201,9 @@ import 'dart:convert';
 
         _lastSyncTime = DateTime.now();
 
+        // ── Photo Upload ──────────────────────────────────────────────────────
+        await _uploadPendingPhotos(db);
+
         // ── Download Sync ────────────────────────────────────────────────────
         if (_supabase != null) {
           final userId = _supabase!.auth.currentUser?.id;
@@ -311,8 +316,53 @@ import 'dart:convert';
         debugPrint('Sync critical error: $e');
       } finally {
         _isSyncing = false;
-        await updatePendingCount();
-        notifyListeners();
+          await updatePendingCount();
+          notifyListeners();
+        }
+      }
+    }
+
+    Future<void> _uploadPendingPhotos(Database db) async {
+      if (_supabase == null) return;
+      const String bucket = 'inspection-photos';
+      final List<Map<String, dynamic>> pending = await db.query(
+        'inspection_photos',
+        where: "sync_status = 'pending'",
+      );
+      for (final row in pending) {
+        final int rowId      = row['id'] as int;
+        final String visitId = row['visit_id'] as String;
+        final String path    = row['local_path'] as String;
+        try {
+          final File file = File(path);
+          if (!await file.exists()) {
+            await db.update('inspection_photos', {'sync_status': 'orphaned'}, where: 'id = ?', whereArgs: [rowId]);
+            continue;
+          }
+          final Uint8List bytes = await file.readAsBytes();
+          final String ext = path.split('.').last.toLowerCase();
+          final String storagePath = 'retry/$visitId/${rowId}_${DateTime.now().millisecondsSinceEpoch}.$ext';
+          await _supabase!.storage
+              .from(bucket)
+              .uploadBinary(
+                storagePath,
+                bytes,
+                fileOptions: FileOptions(
+                  contentType: ext == 'png' ? 'image/png' : 'image/jpeg',
+                  upsert: true,
+                ),
+              );
+          final String url = _supabase!.storage.from(bucket).getPublicUrl(storagePath);
+          await db.update(
+            'inspection_photos',
+            {'remote_url': url, 'sync_status': 'synced'},
+            where: 'id = ?',
+            whereArgs: [rowId],
+          );
+          debugPrint('[PhotoSync] Uploaded pending photo $rowId');
+        } catch (e) {
+          debugPrint('[PhotoSync] Failed to upload photo $rowId: $e');
+        }
       }
     }
   }
