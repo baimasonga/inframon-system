@@ -162,7 +162,7 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
                         ),
                       )
                     : RefreshIndicator(
-                        onRefreshed: _fetchProjects,
+                        onRefresh: _fetchProjects,
                         child: ListView.separated(
                           padding: const EdgeInsets.all(16),
                           itemCount: _filtered.length,
@@ -370,27 +370,7 @@ class _ProjectCardState extends State<_ProjectCard> {
   }
 }
 
-class _MiniStat extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  const _MiniStat(
-      {required this.icon, required this.label, required this.color});
 
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 14, color: color),
-        const SizedBox(width: 5),
-        Text(label,
-            style: GoogleFonts.inter(
-                fontSize: 12, color: AppColors.textSecondary)),
-      ],
-    );
-  }
-}
 
 class _ActionTile extends StatelessWidget {
   final IconData icon;
