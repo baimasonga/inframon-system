@@ -98,6 +98,7 @@ class _InspectionFormScreenState extends State<InspectionFormScreen> {
       'site_supervisor_present': true,
       'overall_progress': _overallProgress.toInt(),
       'overall_status': _overallProgress > 70 ? 'Good' : 'Fair',
+      'recommendation': _overallProgress > 70 ? 'Continue work' : 'Proceed with caution',
       'notes': _notesController.text,
       'milestones': [], 
       'issues': _defects,
@@ -109,19 +110,29 @@ class _InspectionFormScreenState extends State<InspectionFormScreen> {
       }).toList(),
       'hse_record': {
         'ppe_usage_pct': _ppeCompliance.toInt(),
-        'waste_management': _checklist.firstWhere((c) => c['task'].contains('Waste'))['done'] ? 'Verified Good' : 'Requires Action',
-        'environmental_protection': 'Standard Precautions'
+        'incident_reports': 'None',
+        'waste_management': _checklist.any((c) => c['task'].contains('Waste') && c['done']) ? 'Verified' : 'Pending',
+        'environmental_protection': 'Standard',
+        'first_aid_available': true
       },
-      'materials': _checklist.where((c) => c['category'] == 'Materials').map((c) => {
-        'item': c['task'],
-        'pass': c['done'],
-        'notes': 'Verified on-site'
-      }).toList(),
+      'equipment': {
+        'machinery_available': 'Site tools',
+        'equipment_condition': 'Operational',
+        'fuel_availability': 'Adequate'
+      },
+      'community': {
+        'satisfaction_level': 'Satisfied',
+        'complaints': _notesController.text.contains('complaint') ? _notesController.text : 'None',
+        'land_disputes': false
+      },
       'compliance': {
-        'approved_drawings_on_site': _checklist.firstWhere((c) => c['category'] == 'Compliance')['done'],
+        'approved_drawings_on_site': _checklist.any((c) => c['category'] == 'Compliance' && c['done']),
         'work_permits_valid': true,
-        'previous_issues_resolved': false
-      }
+        'notes': 'Verified on-site'
+      },
+      'photos': _photo != null ? [
+        {'url': 'https://placeholder.com/site.jpg', 'category': 'During', 'caption': 'Mobile Site Capture'}
+      ] : []
     };
 
     // 3. Queue for Sync
