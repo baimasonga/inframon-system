@@ -139,9 +139,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       setState(() {
         _checkedIn = true;
         _checkInTime = DateFormat('HH:mm').format(now);
-        _location = lat != null
-            ? '${lat.toStringAsFixed(4)}, ${lng!.toStringAsFixed(4)}'
-            : 'GPS unavailable';
         _loading = false;
       });
     }
@@ -199,7 +196,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
     if (mounted) {
       setState(() {
-        _checkOutTime = DateFormat('HH:mm').format(now);
         _checkedIn = false;
         _loading = false;
         _activeProjectId = null;
