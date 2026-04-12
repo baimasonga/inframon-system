@@ -2,35 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../main.dart';
-import '../inspections/inspection_form_screen.dart';
+import '../../core/database/db_helper.dart';
 import '../inspections/multi_step_wizard.dart';
 import '../issues/issue_report_screen.dart';
 import 'timeline_screen.dart';
-import '../workforce/workforce_entry_screen.dart';
 import 'map_screen.dart';
-
-const _mockProjects = [
-  {
-    'id': 'proj-1',
-    'name': 'Highway Renovation A1',
-    'status': 'active',
-    'phase': 'Phase 2: Structural Framing',
-    'progress': 0.45,
-    'inspections': 9,
-    'issues': 2,
-    'location': 'Freeway Junction, Sector 4',
-  },
-  {
-    'id': 'proj-2',
-    'name': 'City Hall Extension',
-    'status': 'planned',
-    'phase': 'Phase 1: Site Preparation',
-    'progress': 0.12,
-    'inspections': 2,
-    'issues': 1,
-    'location': 'Downtown District, Block 7',
-  },
-];
 
 class ProjectsListScreen extends StatefulWidget {
   const ProjectsListScreen({super.key});
@@ -42,6 +18,7 @@ class ProjectsListScreen extends StatefulWidget {
 class _ProjectsListScreenState extends State<ProjectsListScreen> {
   List<Map<String, dynamic>> _projects = [];
   bool _isLoading = true;
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -50,21 +27,28 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
   }
 
   Future<void> _fetchProjects() async {
+    if (!mounted) return;
+    setState(() => _isLoading = true);
     try {
       final db = await DatabaseHelper.instance.database;
       final localProjects = await db.query('projects', orderBy: 'created_at DESC');
 
       if (localProjects.isNotEmpty) {
-        final mapped = localProjects.map((p) => {
-              'id': p['id'],
-              'name': p['name'],
-              'status': p['status'].toString().toLowerCase(),
-              'phase': p['status'] == 'Completed' ? 'Completed' : 'Phase 1: Tracking',
-              'progress': 0.0, // Progress might need a separate fetch or join
-              'inspections': 0,
-              'issues': 0,
-              'location': 'Assigned District',
-            }).toList();
+        final mapped = localProjects.map((p) {
+          final pct = (p['completion_percentage'] as int? ?? 0) / 100.0;
+          return {
+            'id': p['id'],
+            'name': p['name'],
+            'status': (p['status'] ?? '').toString().toLowerCase(),
+            'phase': p['status'] == 'Completed'
+                ? 'Completed'
+                : 'Phase: Tracking',
+            'progress': pct.clamp(0.0, 1.0),
+            'inspections': 0,
+            'issues': 0,
+            'location': p['district'] ?? 'Sierra Leone',
+          };
+        }).toList();
 
         if (mounted) {
           setState(() {
@@ -72,42 +56,48 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
             _isLoading = false;
           });
         }
-      } else {
-        // Fallback to Supabase if local is empty (e.g., first run before sync)
-        final data = await Supabase.instance.client
-            .from('projects')
-            .select()
-            .order('created_at', ascending: false);
-
-        if (data.isNotEmpty) {
-          final mapped = data.map((p) => {
-                'id': p['id'],
-                'name': p['name'],
-                'status': p['status'].toString().toLowerCase(),
-                'phase': p['status'] == 'Completed' ? 'Completed' : 'Phase 1: Tracking',
-                'progress': ((p['completion_percentage'] ?? 0) / 100).toDouble(),
-                'inspections': 0,
-                'issues': 0,
-                'location': p['district'],
-              }).toList();
-
-          if (mounted) {
-            setState(() {
-              _projects = List<Map<String, dynamic>>.from(mapped);
-              _isLoading = false;
-            });
-          }
-        }
+        return;
       }
-    } catch (e) {
-      debugPrint('Error fetching projects: $e');
+
+      // Online fallback on first run (before sync)
+      final data = await Supabase.instance.client
+          .from('projects')
+          .select()
+          .order('created_at', ascending: false);
+
+      final mapped = (data as List<dynamic>).map((p) {
+        final pct = ((p['completion_percentage'] ?? 0) as num) / 100.0;
+        return {
+          'id': p['id'],
+          'name': p['name'],
+          'status': (p['status'] ?? '').toString().toLowerCase(),
+          'phase': p['status'] == 'Completed' ? 'Completed' : 'Phase: Active',
+          'progress': pct.clamp(0.0, 1.0),
+          'inspections': 0,
+          'issues': 0,
+          'location': p['district'] ?? 'Sierra Leone',
+        };
+      }).toList();
+
       if (mounted) {
         setState(() {
-          _projects = List<Map<String, dynamic>>.from(_mockProjects);
+          _projects = List<Map<String, dynamic>>.from(mapped);
           _isLoading = false;
         });
       }
+    } catch (e) {
+      debugPrint('Error fetching projects: $e');
+      if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  List<Map<String, dynamic>> get _filtered {
+    if (_searchQuery.isEmpty) return _projects;
+    final q = _searchQuery.toLowerCase();
+    return _projects.where((p) {
+      return (p['name'] as String).toLowerCase().contains(q) ||
+          (p['location'] as String).toLowerCase().contains(q);
+    }).toList();
   }
 
   @override
@@ -124,26 +114,74 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
               MaterialPageRoute(builder: (_) => const MapScreen()),
             ),
           ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _fetchProjects,
+          ),
         ],
       ),
-      body: _isLoading 
-        ? const Center(child: CircularProgressIndicator())
-        : ListView.separated(
-            padding: const EdgeInsets.all(16),
-            itemCount: _projects.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 12),
-            itemBuilder: (context, i) {
-              final p = _projects[i];
-              return _ProjectCard(project: p);
-            },
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            child: TextField(
+              onChanged: (v) => setState(() => _searchQuery = v),
+              decoration: InputDecoration(
+                hintText: 'Search projects...',
+                prefixIcon: const Icon(Icons.search, size: 20),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide:
+                      const BorderSide(color: AppColors.border),
+                ),
+              ),
+            ),
           ),
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _filtered.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.folder_open,
+                                size: 48, color: AppColors.border),
+                            const SizedBox(height: 12),
+                            Text(
+                              _projects.isEmpty
+                                  ? 'No projects yet.\nTap Sync on the home screen to load your assignments.'
+                                  : 'No projects match "$_searchQuery"',
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.inter(
+                                  color: AppColors.textSecondary),
+                            ),
+                          ],
+                        ),
+                      )
+                    : RefreshIndicator(
+                        onRefreshed: _fetchProjects,
+                        child: ListView.separated(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: _filtered.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 12),
+                          itemBuilder: (context, i) =>
+                              _ProjectCard(p: _filtered[i]),
+                        ),
+                      ),
+          ),
+        ],
+      ),
     );
   }
 }
 
 class _ProjectCard extends StatefulWidget {
-  final Map<String, dynamic> project;
-  const _ProjectCard({required this.project});
+  final Map<String, dynamic> p;
+  const _ProjectCard({required this.p});
 
   @override
   State<_ProjectCard> createState() => _ProjectCardState();
@@ -154,170 +192,173 @@ class _ProjectCardState extends State<_ProjectCard> {
 
   @override
   Widget build(BuildContext context) {
-    final p = widget.project;
-    final isActive = p['status'] == 'active';
-    final progress = (p['progress'] as double);
+    final p = widget.p;
+    final double progress = (p['progress'] as double).clamp(0.0, 1.0);
+    final bool isActive = p['status'] == 'active';
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isActive ? AppColors.blue.withValues(alpha: 0.3) : AppColors.border,
-        ),
-        boxShadow: isActive
-            ? [
-                BoxShadow(
-                  color: AppColors.blue.withValues(alpha: 0.08),
-                  blurRadius: 16,
-                  offset: const Offset(0, 4),
-                )
-              ]
-            : [],
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         children: [
-          // ── Header ──────────────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: isActive ? AppColors.blueSoft : const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        isActive ? '● Active' : 'Planned',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: isActive ? AppColors.blue : AppColors.textSecondary,
+          InkWell(
+            onTap: () => setState(() => _expanded = !_expanded),
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: isActive
+                              ? AppColors.blueSoft
+                              : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          isActive ? 'Active' : p['status'].toString(),
+                          style: GoogleFonts.inter(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: isActive
+                                  ? AppColors.blue
+                                  : AppColors.textSecondary),
                         ),
                       ),
-                    ),
-                    const Spacer(),
-                    GestureDetector(
-                      onTap: () => setState(() => _expanded = !_expanded),
-                      child: Icon(
-                        _expanded ? Icons.expand_less : Icons.expand_more,
+                      const Spacer(),
+                      Icon(
+                        _expanded
+                            ? Icons.keyboard_arrow_up
+                            : Icons.keyboard_arrow_down,
                         color: AppColors.textSecondary,
+                        size: 20,
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  p['name'],
-                  style: GoogleFonts.inter(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
+                    ],
                   ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    const Icon(Icons.location_on_outlined, size: 14, color: AppColors.textSecondary),
-                    const SizedBox(width: 4),
-                    Text(p['location'],
-                        style: GoogleFonts.inter(fontSize: 12, color: AppColors.textSecondary)),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                // Progress
-                Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(p['phase'],
-                              style: GoogleFonts.inter(
-                                  fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
-                          const SizedBox(height: 6),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: LinearProgressIndicator(
-                              value: progress,
-                              minHeight: 8,
-                              backgroundColor: AppColors.blueSoft,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                isActive ? AppColors.blue : AppColors.textSecondary,
+                  const SizedBox(height: 8),
+                  Text(
+                    p['name'],
+                    style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(Icons.location_on_outlined,
+                          size: 14, color: AppColors.textSecondary),
+                      const SizedBox(width: 4),
+                      Text(p['location'],
+                          style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: AppColors.textSecondary)),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(p['phase'],
+                                style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    color: AppColors.textSecondary,
+                                    fontWeight: FontWeight.w500)),
+                            const SizedBox(height: 6),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: LinearProgressIndicator(
+                                value: progress,
+                                minHeight: 8,
+                                backgroundColor: AppColors.blueSoft,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  isActive
+                                      ? AppColors.blue
+                                      : AppColors.textSecondary,
+                                ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 16),
-                    Text(
-                      '${(progress * 100).round()}%',
-                      style: GoogleFonts.inter(
-                          fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                // Mini stats
-                Row(
-                  children: [
-                    _MiniStat(icon: Icons.fact_check_outlined, label: '${p['inspections']} Inspections', color: AppColors.blue),
-                    const SizedBox(width: 16),
-                    _MiniStat(icon: Icons.flag_outlined, label: '${p['issues']} Issues', color: AppColors.danger),
-                  ],
-                ),
-              ],
+                      const SizedBox(width: 16),
+                      Text(
+                        '${(progress * 100).round()}%',
+                        style: GoogleFonts.inter(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
-
-          // ── Expanded actions ─────────────────────────────────────────────
           if (_expanded) ...[
             const Divider(height: 1, color: AppColors.border),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: Column(
                 children: [
                   _ActionTile(
                     icon: Icons.fact_check,
                     label: 'New Site Inspection Report',
                     iconColor: AppColors.blue,
-                    onTap: () => Navigator.push(context, MaterialPageRoute(
-                      builder: (_) => MultiStepInspectionWizard(
-                        projectId: p['id'], 
-                        projectName: p['name'],
-                        projectType: p['phase'],
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => MultiStepInspectionWizard(
+                          projectId: p['id'],
+                          projectName: p['name'],
+                          projectType: p['phase'],
+                        ),
                       ),
-                    )),
+                    ),
                   ),
                   _ActionTile(
                     icon: Icons.report_problem,
                     label: 'Report Issue',
                     iconColor: AppColors.danger,
-                    onTap: () => Navigator.push(context, MaterialPageRoute(
-                      builder: (_) => IssueReportScreen(projectId: p['id']),
-                    )),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            IssueReportScreen(projectId: p['id']),
+                      ),
+                    ),
                   ),
                   _ActionTile(
                     icon: Icons.timeline,
-                    label: 'Project Timeline',
-                    iconColor: AppColors.amber,
-                    onTap: () => Navigator.push(context, MaterialPageRoute(
-                      builder: (_) => TimelineScreen(projectId: p['id']),
-                    )),
-                  ),
-                  _ActionTile(
-                    icon: Icons.people_alt,
-                    label: 'Log Daily Workforce',
-                    iconColor: const Color(0xFF8B5CF6),
-                    onTap: () => Navigator.push(context, MaterialPageRoute(
-                      builder: (_) => WorkforceEntryScreen(projectId: p['id']),
-                    )),
+                    label: 'View Timeline',
+                    iconColor: AppColors.success,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            TimelineScreen(projectId: p['id']),
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -333,15 +374,19 @@ class _MiniStat extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color color;
-  const _MiniStat({required this.icon, required this.label, required this.color});
+  const _MiniStat(
+      {required this.icon, required this.label, required this.color});
 
   @override
   Widget build(BuildContext context) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Icon(icon, size: 14, color: color),
         const SizedBox(width: 5),
-        Text(label, style: GoogleFonts.inter(fontSize: 12, color: AppColors.textSecondary)),
+        Text(label,
+            style: GoogleFonts.inter(
+                fontSize: 12, color: AppColors.textSecondary)),
       ],
     );
   }
@@ -379,9 +424,12 @@ class _ActionTile extends StatelessWidget {
             const SizedBox(width: 14),
             Text(label,
                 style: GoogleFonts.inter(
-                    fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary)),
             const Spacer(),
-            const Icon(Icons.chevron_right, size: 18, color: AppColors.textSecondary),
+            const Icon(Icons.chevron_right,
+                size: 18, color: AppColors.textSecondary),
           ],
         ),
       ),
