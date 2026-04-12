@@ -320,7 +320,6 @@ import 'dart:typed_data';
           notifyListeners();
         }
       }
-    }
 
     Future<void> _uploadPendingPhotos(Database db) async {
       if (_supabase == null) return;
