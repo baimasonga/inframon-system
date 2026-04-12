@@ -12,12 +12,14 @@ class MultiStepInspectionWizard extends StatefulWidget {
   final String projectId;
   final String projectName;
   final String projectType;
+  final String? taskId;
 
   const MultiStepInspectionWizard({
     super.key,
     required this.projectId,
     required this.projectName,
     required this.projectType,
+    this.taskId,
   });
 
   @override
@@ -225,12 +227,41 @@ class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
 
     setState(() => _isSaving = false);
     if (mounted) {
+      // Mark linked task as Completed when inspection is submitted from a task
+      if (widget.taskId != null) {
+        try {
+          final now = DateTime.now().toIso8601String();
+          await db.update(
+            'inspection_tasks',
+            {
+              'status': 'Completed',
+              'updated_at': now,
+              'sync_status': 'pending',
+            },
+            where: 'id = ?',
+            whereArgs: [widget.taskId],
+          );
+          await db.insert('sync_queue', {
+            'entity_type': 'inspection_task_update',
+            'entity_id': widget.taskId!,
+            'operation': 'UPDATE',
+            'payload': '{"id":"' + widget.taskId! + '","status":"Completed","updated_at":"' + now + '"}',
+            'created_at': now,
+          });
+        } catch (e) {
+          debugPrint('Task auto-completion failed: ' + e.toString());
+        }
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Report saved and queued for synchronization!'),
+        SnackBar(
+          content: Text(widget.taskId != null
+              ? 'Inspection saved — task marked as Completed!'
+              : 'Report saved and queued for synchronization!'),
+          backgroundColor: const Color(0xFF10B981),
         ),
       );
-      Navigator.pop(context);
+      Navigator.pop(context, widget.taskId != null ? 'task_completed' : null);
     }
   }
 
