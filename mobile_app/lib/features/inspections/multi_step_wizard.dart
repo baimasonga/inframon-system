@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -108,6 +109,39 @@ class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
     if (picked != null) setState(() => _photos.add(File(picked.path)));
   }
 
+    /// Upload captured photos to Supabase Storage bucket 'inspection-photos'.
+    /// Returns list of public URLs. Safe to call offline (returns empty list on failure).
+    Future<List<String>> _uploadPhotosToStorage(String visitId) async {
+      final List<String> urls = [];
+      const bucket = 'inspection-photos';
+      for (int i = 0; i < _photos.length; i++) {
+        try {
+          final Uint8List bytes = await _photos[i].readAsBytes();
+          final String ext = _photos[i].path.split('.').last.toLowerCase();
+          final String fileName = '${visitId}_${i}_${DateTime.now().millisecondsSinceEpoch}.${ext}';
+          final String storagePath = '${widget.projectId}/$visitId/$fileName';
+          await Supabase.instance.client.storage
+              .from(bucket)
+              .uploadBinary(
+                storagePath,
+                bytes,
+                fileOptions: FileOptions(
+                  contentType: ext == 'png' ? 'image/png' : 'image/jpeg',
+                  upsert: true,
+                ),
+              );
+          final String publicUrl = Supabase.instance.client.storage
+              .from(bucket)
+              .getPublicUrl(storagePath);
+          urls.add(publicUrl);
+          debugPrint('[Photos] Uploaded $i: $publicUrl');
+        } catch (e) {
+          debugPrint('[Photos] Upload failed for photo $i: $e');
+        }
+      }
+      return urls;
+    }
+
   Future<void> _saveFinalReport() async {
     setState(() => _isSaving = true);
 
@@ -136,7 +170,27 @@ class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
     final db = await DatabaseHelper.instance.database;
     final visitId = DateTime.now().millisecondsSinceEpoch.toString();
 
-    // 1. Prepare Payload for Cloud RPC
+      // 1a. Upload photos to Supabase Storage (best-effort — offline safe)
+      List<String> photoUrls = [];
+      if (_photos.isNotEmpty) {
+        try {
+          photoUrls = await _uploadPhotosToStorage(visitId);
+        } catch (e) {
+          debugPrint('[Photos] Batch upload failed (will retry on sync): $e');
+        }
+        for (int i = 0; i < _photos.length; i++) {
+          final bool hasUrl = i < photoUrls.length;
+          await db.insert('inspection_photos', {
+            'visit_id': visitId,
+            'local_path': _photos[i].path,
+            'remote_url': hasUrl ? photoUrls[i] : null,
+            'sync_status': hasUrl ? 'synced' : 'pending',
+            'created_at': DateTime.now().toIso8601String(),
+          });
+        }
+      }
+
+      // 1. Prepare Payload for Cloud RPC
     final payload = {
       'project_id': widget.projectId,
       'inspector_id': Supabase.instance.client.auth.currentUser?.id,
@@ -150,6 +204,7 @@ class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
       'notes': _notesController.text,
       'gps_lat': gpsLat,
       'gps_lng': gpsLng,
+      'photo_urls': photoUrls,
       'milestones': _milestones
           .map(
             (m) => {
