@@ -778,7 +778,7 @@ class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: status == 'Completed'
-            ? Colors.emerald.withValues(alpha: 0.1)
+            ? AppColors.success.withValues(alpha: 0.1)
             : Colors.blue.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
       ),
@@ -899,7 +899,7 @@ class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
                 label: 'QC Pass',
                 value:
                     '${_qualityChecks.where((q) => q['pass']).length}/${_qualityChecks.length}',
-                color: Colors.emerald,
+                color: AppColors.success,
               ),
             ],
           ),
@@ -1012,7 +1012,7 @@ class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
               child: OutlinedButton(
                 onPressed: () => setState(() => _currentStep--),
                 style: OutlinedButton.styleFrom(
-                  height: 52,
+                  minimumSize: const Size.fromHeight(52),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
@@ -1037,7 +1037,7 @@ class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
                 backgroundColor: _currentStep == 6
                     ? AppColors.success
                     : AppColors.blue,
-                height: 52,
+                minimumSize: const Size.fromHeight(52),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
