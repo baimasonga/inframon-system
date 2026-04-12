@@ -6,7 +6,6 @@ import '../../main.dart';
 import '../../core/database/db_helper.dart';
 import '../sync/sync_provider.dart';
 import '../projects/projects_list_screen.dart';
-import '../inspections/inspection_form_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
