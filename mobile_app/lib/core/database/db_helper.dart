@@ -19,7 +19,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -162,7 +162,12 @@ class DatabaseHelper {
       description TEXT,
       deadline TEXT,
       priority TEXT,
-      status TEXT
+      status TEXT DEFAULT 'Pending',
+      field_notes TEXT,
+      gps_lat REAL,
+      gps_lng REAL,
+      updated_at TEXT,
+      sync_status TEXT DEFAULT 'synced'
     )
     ''');
 
@@ -215,6 +220,13 @@ class DatabaseHelper {
       await db.execute(
         'ALTER TABLE projects ADD COLUMN completion_percentage INTEGER DEFAULT 0',
       );
+    }
+    if (oldVersion < 3) {
+      await db.execute('ALTER TABLE inspection_tasks ADD COLUMN field_notes TEXT');
+      await db.execute('ALTER TABLE inspection_tasks ADD COLUMN gps_lat REAL');
+      await db.execute('ALTER TABLE inspection_tasks ADD COLUMN gps_lng REAL');
+      await db.execute('ALTER TABLE inspection_tasks ADD COLUMN updated_at TEXT');
+      await db.execute("ALTER TABLE inspection_tasks ADD COLUMN sync_status TEXT DEFAULT 'synced'");
     }
   }
 }
