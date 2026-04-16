@@ -1,0 +1,52 @@
+name: Build InfraMon APK
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'mobile_app/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.27.4'
+          channel: 'stable'
+          cache: true
+
+      - name: Get pub dependencies
+        working-directory: mobile_app
+        run: flutter pub get
+
+      - name: Build release APK
+        working-directory: mobile_app
+        run: flutter build apk --release --no-pub
+
+      - name: Rename APK with build number
+        run: |
+          mkdir -p artifacts
+          cp mobile_app/build/app/outputs/flutter-apk/app-release.apk \
+             artifacts/InfraMon-$(date +'%Y%m%d-%H%M')-$(echo $GITHUB_SHA | cut -c1-7).apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: InfraMon-APK
+          path: artifacts/*.apk
+          retention-days: 30
