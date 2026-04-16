@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../main.dart';
 import '../../core/database/db_helper.dart';
+import '../../core/services/location_service.dart';
 
 class InspectionFormScreen extends StatefulWidget {
   final String projectId;
@@ -20,6 +21,9 @@ class _InspectionFormScreenState extends State<InspectionFormScreen> {
   String? _inspectorId;
   File? _photo;
   bool _isSaving = false;
+  double? _gpsLat;
+  double? _gpsLng;
+  bool _gpsLoading = false;
   
   double _overallProgress = 0;
   double _ppeCompliance = 80;
@@ -57,6 +61,28 @@ class _InspectionFormScreenState extends State<InspectionFormScreen> {
     }
   }
 
+  Future<void> _captureGPS() async {
+    setState(() => _gpsLoading = true);
+    final result = await LocationService.getLocationWithFeedback();
+    setState(() {
+      _gpsLoading = false;
+      if (result.hasLocation) {
+        _gpsLat = result.position!.latitude;
+        _gpsLng = result.position!.longitude;
+      }
+    });
+    if (!result.hasLocation && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result.errorMessage ?? 'GPS unavailable.'),
+          backgroundColor: const Color(0xFFf59e0b),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    }
+  }
+
   Future<void> _pickPhoto() async {
     final picker = ImagePicker();
     final picked = await picker.pickImage(source: ImageSource.camera, imageQuality: 80);
@@ -85,6 +111,8 @@ class _InspectionFormScreenState extends State<InspectionFormScreen> {
       'overall_progress': _overallProgress.toInt(),
       'overall_status': _overallProgress > 70 ? 'Good' : 'Fair',
       'notes': _notesController.text,
+      'gps_lat': _gpsLat,
+      'gps_lng': _gpsLng,
       'sync_status': 'pending',
     });
 
@@ -130,6 +158,8 @@ class _InspectionFormScreenState extends State<InspectionFormScreen> {
         'work_permits_valid': true,
         'notes': 'Verified on-site'
       },
+      'gps_lat': _gpsLat,
+      'gps_lng': _gpsLng,
       'photos': _photo != null ? [
         {'url': 'https://placeholder.com/site.jpg', 'category': 'During', 'caption': 'Mobile Site Capture'}
       ] : []
@@ -353,6 +383,70 @@ class _InspectionFormScreenState extends State<InspectionFormScreen> {
                   ],
                 );
               }).toList(),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // ── GPS Location ──────────────────────────────────────────────
+          _SectionTitle('GPS Location'),
+          const SizedBox(height: 8),
+          _FormCard(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (_gpsLat != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.check_circle, color: Color(0xFF16a34a), size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Lat: ${_gpsLat!.toStringAsFixed(6)}, Lng: ${_gpsLng!.toStringAsFixed(6)}',
+                            style: const TextStyle(fontSize: 13, color: Color(0xFF16a34a), fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 12),
+                    child: Text(
+                      'GPS not yet captured for this visit.',
+                      style: TextStyle(fontSize: 13, color: Color(0xFF64748b)),
+                    ),
+                  ),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _gpsLoading ? null : _captureGPS,
+                    icon: _gpsLoading
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.my_location, size: 18),
+                    label: Text(
+                      _gpsLoading
+                          ? 'Acquiring GPS…'
+                          : _gpsLat != null
+                              ? 'Recapture GPS'
+                              : 'Capture GPS Location',
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.blue,
+                      side: const BorderSide(color: AppColors.blue),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 20),
