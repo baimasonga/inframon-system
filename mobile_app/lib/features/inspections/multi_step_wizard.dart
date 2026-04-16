@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:geolocator/geolocator.dart';
+import '../../core/services/location_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../main.dart';
 import '../../core/database/db_helper.dart';
@@ -145,26 +145,22 @@ class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
   Future<void> _saveFinalReport() async {
     setState(() => _isSaving = true);
 
-    // Fetch real GPS before building payload
-    double gpsLat = 8.484;
-    double gpsLng = -13.234;
-    try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (serviceEnabled) {
-        LocationPermission perm = await Geolocator.checkPermission();
-        if (perm == LocationPermission.denied) {
-          perm = await Geolocator.requestPermission();
-        }
-        if (perm == LocationPermission.whileInUse || perm == LocationPermission.always) {
-          final pos = await Geolocator.getCurrentPosition(
-            locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
-          );
-          gpsLat = pos.latitude;
-          gpsLng = pos.longitude;
-        }
-      }
-    } catch (e) {
-      debugPrint('GPS fetch failed, using default: $e');
+    // Fetch GPS via LocationService — handles permissions and gives specific error feedback
+    final gpsResult = await LocationService.getLocationWithFeedback();
+    final double? gpsLat = gpsResult.position?.latitude;
+    final double? gpsLng = gpsResult.position?.longitude;
+    if (!gpsResult.hasLocation && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${gpsResult.errorMessage ?? 'GPS unavailable.'} '
+            'Report saved without GPS coordinates.',
+          ),
+          backgroundColor: const Color(0xFFf59e0b),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 6),
+        ),
+      );
     }
 
     final db = await DatabaseHelper.instance.database;
