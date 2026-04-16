@@ -1,3 +1,4 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -68,12 +69,13 @@ class _IssueReportScreenState extends State<IssueReportScreen> {
       'payload': jsonEncode({
         'id': issueId,
         'project_id': widget.projectId,
+        'reported_by': Supabase.instance.client.auth.currentUser?.id,
         'title': _titleController.text,
         'description': _descController.text,
         'severity': _severity,
         'status': 'Open',
-        'gps_lat': _currentPosition?.latitude,
-        'gps_lng': _currentPosition?.longitude,
+        'location_lat': _currentPosition?.latitude,
+        'location_lng': _currentPosition?.longitude,
         'created_at': DateTime.now().toIso8601String(),
       }),
       'created_at': DateTime.now().toIso8601String(),
