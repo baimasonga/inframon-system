@@ -68,19 +68,19 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     }
     setState(() => _loading = true);
 
-    // Use LocationService which handles permission requests gracefully
-    final pos = await LocationService.getCurrentLocation();
+    // Get location with specific error feedback
+    final locResult = await LocationService.getLocationWithFeedback();
 
-    if (pos == null && mounted) {
-      // GPS unavailable — inform the user and continue with check-in anyway
+    if (!locResult.hasLocation && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text(
-            'GPS unavailable. Check-in saved without location. Enable location permission for GPS verification.',
+          content: Text(
+            '${locResult.errorMessage ?? 'GPS unavailable.'} '
+            'Check-in saved without GPS verification.',
           ),
           backgroundColor: const Color(0xFFf59e0b),
           behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 5),
+          duration: const Duration(seconds: 6),
           action: SnackBarAction(
             label: 'OK',
             textColor: Colors.white,
@@ -90,7 +90,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       );
     }
 
-    _doCheckIn(pos?.latitude, pos?.longitude);
+    _doCheckIn(locResult.position?.latitude, locResult.position?.longitude);
   }
 
   Future<void> _pickProject() async {
