@@ -1,6 +1,7 @@
 -- =============================================================================
--- InfraMon Supabase Setup — Run once in the Supabase SQL Editor
--- Dashboard: https://supabase.com/dashboard/project/xmkbgqniylgrcudqmkca/sql
+-- InfraMon Supabase Setup (CORRECTED — no FK constraints to avoid type errors)
+-- Paste entire script into SQL Editor and click Run:
+-- https://supabase.com/dashboard/project/xmkbgqniylgrcudqmkca/sql
 -- =============================================================================
 
 -- ── 1. Add missing columns to visit_metadata ────────────────────────────────
@@ -17,11 +18,11 @@ ALTER TABLE public.inspection_tasks
   ADD COLUMN IF NOT EXISTS gps_lng     NUMERIC(10, 7),
   ADD COLUMN IF NOT EXISTS updated_at  TIMESTAMPTZ;
 
--- ── 3. Create attendance_logs table ─────────────────────────────────────────
+-- ── 3. Create attendance_logs (no FK — inspector_id is TEXT on mobile) ───────
 CREATE TABLE IF NOT EXISTS public.attendance_logs (
   id             TEXT PRIMARY KEY,
   project_id     TEXT,
-  inspector_id   TEXT REFERENCES public.users(id) ON DELETE SET NULL,
+  inspector_id   TEXT,
   check_in_time  TIMESTAMPTZ,
   check_out_time TIMESTAMPTZ,
   total_hours    NUMERIC(5, 2),
@@ -31,24 +32,22 @@ CREATE TABLE IF NOT EXISTS public.attendance_logs (
   created_at     TIMESTAMPTZ DEFAULT NOW()
 );
 ALTER TABLE public.attendance_logs ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Authenticated users full access" ON public.attendance_logs;
-CREATE POLICY "Authenticated users full access"
-  ON public.attendance_logs
+DROP POLICY IF EXISTS "auth_full" ON public.attendance_logs;
+CREATE POLICY "auth_full" ON public.attendance_logs
   USING (auth.role() = 'authenticated');
 
--- ── 4. Create analysis_results table (AI photo analysis history) ─────────────
+-- ── 4. Create analysis_results (no FK — visit_id is TEXT on mobile) ─────────
 CREATE TABLE IF NOT EXISTS public.analysis_results (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  visit_id         TEXT REFERENCES public.visit_metadata(id) ON DELETE SET NULL,
+  visit_id         TEXT,
   project_id       TEXT,
   image_url        TEXT,
   analysis_payload JSONB,
   created_at       TIMESTAMPTZ DEFAULT NOW()
 );
 ALTER TABLE public.analysis_results ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Authenticated users full access" ON public.analysis_results;
-CREATE POLICY "Authenticated users full access"
-  ON public.analysis_results
+DROP POLICY IF EXISTS "auth_full" ON public.analysis_results;
+CREATE POLICY "auth_full" ON public.analysis_results
   USING (auth.role() = 'authenticated');
 
 -- ── 5. Create submit_field_report RPC ───────────────────────────────────────
@@ -62,7 +61,6 @@ DECLARE
 BEGIN
   v_visit_id := (report->>'id')::TEXT;
 
-  -- Upsert core visit record
   INSERT INTO public.visit_metadata (
     id, project_id, inspector_id, visit_type, visit_date,
     weather, site_supervisor_present, gps_lat, gps_lng,
@@ -87,14 +85,13 @@ BEGIN
     (report->>'notes')::TEXT
   )
   ON CONFLICT (id) DO UPDATE SET
-    overall_progress       = EXCLUDED.overall_progress,
-    overall_status         = EXCLUDED.overall_status,
-    recommendation         = EXCLUDED.recommendation,
-    notes                  = EXCLUDED.notes,
-    gps_lat                = EXCLUDED.gps_lat,
-    gps_lng                = EXCLUDED.gps_lng;
+    overall_progress = EXCLUDED.overall_progress,
+    overall_status   = EXCLUDED.overall_status,
+    recommendation   = EXCLUDED.recommendation,
+    notes            = EXCLUDED.notes,
+    gps_lat          = EXCLUDED.gps_lat,
+    gps_lng          = EXCLUDED.gps_lng;
 
-  -- Insert defects / issues from the report
   IF report->'issues' IS NOT NULL
      AND jsonb_array_length(report->'issues') > 0 THEN
     INSERT INTO public.defect_reports (
@@ -117,6 +114,5 @@ BEGIN
 END;
 $$;
 
--- Grant execute to authenticated users
 GRANT EXECUTE ON FUNCTION public.submit_field_report(JSONB) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.submit_field_report(JSONB) TO service_role;
