@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:geolocator/geolocator.dart';
+import '../../core/services/location_service.dart';
 import 'package:intl/intl.dart';
 import 'dart:convert';
 import '../../core/database/db_helper.dart';
@@ -67,14 +67,30 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       if (_activeProjectId == null) return;
     }
     setState(() => _loading = true);
-    try {
-      final pos = await Geolocator.getCurrentPosition(
-          locationSettings:
-              const LocationSettings(accuracy: LocationAccuracy.high));
-      _doCheckIn(pos.latitude, pos.longitude);
-    } catch (_) {
-      _doCheckIn(null, null);
+
+    // Use LocationService which handles permission requests gracefully
+    final pos = await LocationService.getCurrentLocation();
+
+    if (pos == null && mounted) {
+      // GPS unavailable — inform the user and continue with check-in anyway
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'GPS unavailable. Check-in saved without location. Enable location permission for GPS verification.',
+          ),
+          backgroundColor: const Color(0xFFf59e0b),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 5),
+          action: SnackBarAction(
+            label: 'OK',
+            textColor: Colors.white,
+            onPressed: () {},
+          ),
+        ),
+      );
     }
+
+    _doCheckIn(pos?.latitude, pos?.longitude);
   }
 
   Future<void> _pickProject() async {
