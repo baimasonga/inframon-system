@@ -144,7 +144,28 @@ import 'dart:typed_data';
           try {
             if (_supabase != null) {
               if (type == 'field_report') {
-                await _supabase!.rpc('submit_field_report', params: {'report': payload});
+                // Try the RPC first; fall back to direct insert if it doesn't exist yet
+                try {
+                  await _supabase!.rpc('submit_field_report', params: {'report': payload});
+                } catch (rpcErr) {
+                  debugPrint('[Sync] RPC submit_field_report failed ($rpcErr). Falling back to direct insert.');
+                  // Map the mobile payload fields to actual Supabase visit_metadata columns
+                  await _supabase!.from('visit_metadata').upsert({
+                    'id':                     payload['id'],
+                    'project_id':             payload['project_id'],
+                    'inspector_id':           payload['inspector_id'],
+                    'visit_type':             payload['visit_type'],
+                    'visit_date':             payload['date_time'] ?? payload['visit_date'],
+                    'weather':                payload['weather_condition'] ?? payload['weather'],
+                    'site_supervisor_present': payload['site_supervisor_present'],
+                    'gps_lat':                payload['gps_lat'],
+                    'gps_lng':                payload['gps_lng'],
+                    'overall_progress':       payload['overall_progress'],
+                    'overall_status':         payload['overall_status'],
+                    'recommendation':         payload['recommendation'],
+                    'notes':                  payload['notes'],
+                  });
+                }
               } else if (type == 'inspection_task_update') {
                 final taskId = payload['id'].toString();
                 final Map<String, dynamic> updateFields = {'status': payload['status']};
