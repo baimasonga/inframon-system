@@ -133,12 +133,17 @@ class InfraMonApp extends StatelessWidget {
         home: StreamBuilder<AuthState>(
           stream: Supabase.instance.client.auth.onAuthStateChange,
           builder: (context, snapshot) {
-            final session = snapshot.data?.session;
-            if (session != null) {
-              return const MainShell();
-            } else {
-              return const LoginScreen();
+            // While waiting for the first auth event, check the session
+            // synchronously so we never freeze on the logo screen
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              final currentSession =
+                  Supabase.instance.client.auth.currentSession;
+              return currentSession != null
+                  ? const MainShell()
+                  : const LoginScreen();
             }
+            final session = snapshot.data?.session;
+            return session != null ? const MainShell() : const LoginScreen();
           },
         ),
       ),
