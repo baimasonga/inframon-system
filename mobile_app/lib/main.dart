@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'core/database/db_helper.dart';
 import 'features/sync/sync_provider.dart';
+import 'core/providers/role_provider.dart';
 import 'features/home/home_screen.dart';
 import 'features/projects/projects_list_screen.dart';
 import 'features/issues/issues_list_screen.dart';
@@ -59,6 +60,7 @@ class InfraMonApp extends StatelessWidget {
       providers: [
         Provider(create: (_) => DatabaseHelper.instance),
         ChangeNotifierProvider(create: (_) => SyncProvider()),
+        ChangeNotifierProvider(create: (_) => RoleProvider()),
       ],
       child: MaterialApp(
         title: 'InfraMon Field Tool',
@@ -626,117 +628,133 @@ class MainShell extends StatefulWidget {
   State<MainShell> createState() => _MainShellState();
 }
 
+// ── All possible nav entries (index must match _allScreens) ─────────────────
+class _NavEntry {
+  final Widget screen;
+  final IconData icon;
+  final IconData activeIcon;
+  final String label;
+  final List<String> allowedRoles; // empty = all roles
+  const _NavEntry({
+    required this.screen,
+    required this.icon,
+    required this.activeIcon,
+    required this.label,
+    this.allowedRoles = const [],
+  });
+}
+
+const _allNavEntries = [
+  _NavEntry(
+    screen: HomeScreen(),
+    icon: Icons.dashboard_outlined, activeIcon: Icons.dashboard, label: 'Home',
+  ),
+  _NavEntry(
+    screen: ProjectsListScreen(),
+    icon: Icons.folder_outlined, activeIcon: Icons.folder, label: 'Projects',
+  ),
+  _NavEntry(
+    screen: TasksScreen(),
+    icon: Icons.assignment_outlined, activeIcon: Icons.assignment, label: 'Tasks',
+    allowedRoles: ['Clerk of Works', 'Civil Engineer', 'M&E Officer', 'Procurement Officer', 'System Admin'],
+  ),
+  _NavEntry(
+    screen: IssuesListScreen(),
+    icon: Icons.flag_outlined, activeIcon: Icons.flag, label: 'Issues',
+    allowedRoles: ['Clerk of Works', 'Civil Engineer', 'M&E Officer', 'System Admin'],
+  ),
+  _NavEntry(
+    screen: WorkforceEntryScreen(),
+    icon: Icons.people_outline, activeIcon: Icons.people, label: 'Workforce',
+    allowedRoles: ['Clerk of Works', 'Civil Engineer', 'System Admin'],
+  ),
+  _NavEntry(
+    screen: AIPhotoScreen(),
+    icon: Icons.auto_awesome_outlined, activeIcon: Icons.auto_awesome, label: 'AI Photo',
+    allowedRoles: ['Clerk of Works', 'Civil Engineer', 'M&E Officer', 'System Admin'],
+  ),
+  _NavEntry(
+    screen: AttendanceScreen(),
+    icon: Icons.access_time_outlined, activeIcon: Icons.access_time, label: 'Attendance',
+    allowedRoles: ['Clerk of Works', 'Civil Engineer', 'Procurement Officer', 'System Admin'],
+  ),
+  _NavEntry(
+    screen: NotificationsScreen(),
+    icon: Icons.notifications_outlined, activeIcon: Icons.notifications, label: 'Alerts',
+  ),
+];
+
+List<_NavEntry> _navEntriesForRole(String role) {
+  return _allNavEntries
+      .where((e) => e.allowedRoles.isEmpty || e.allowedRoles.contains(role))
+      .toList();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
+  List<_NavEntry> _activeEntries = _allNavEntries; // default: show all
 
-  final List<Widget> _screens = const [
-    HomeScreen(),
-    ProjectsListScreen(),
-    TasksScreen(),
-    IssuesListScreen(),
-    WorkforceEntryScreen(),
-    AIPhotoScreen(),
-    AttendanceScreen(),
-    NotificationsScreen(),
-  ];
-
-  final List<_NavItem> _navItems = const [
-    _NavItem(
-      icon: Icons.dashboard_outlined,
-      activeIcon: Icons.dashboard,
-      label: 'Home',
-    ),
-    _NavItem(
-      icon: Icons.folder_outlined,
-      activeIcon: Icons.folder,
-      label: 'Projects',
-    ),
-    _NavItem(
-      icon: Icons.assignment_outlined,
-      activeIcon: Icons.assignment,
-      label: 'Tasks',
-    ),
-    _NavItem(
-      icon: Icons.flag_outlined,
-      activeIcon: Icons.flag,
-      label: 'Issues',
-    ),
-    _NavItem(
-      icon: Icons.people_outline,
-      activeIcon: Icons.people,
-      label: 'Workforce',
-    ),
-    _NavItem(
-      icon: Icons.auto_awesome_outlined,
-      activeIcon: Icons.auto_awesome,
-      label: 'AI Photo',
-    ),
-    _NavItem(
-      icon: Icons.access_time_outlined,
-      activeIcon: Icons.access_time,
-      label: 'Attendance',
-    ),
-    _NavItem(
-      icon: Icons.notifications_outlined,
-      activeIcon: Icons.notifications,
-      label: 'Alerts',
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    // Load role then rebuild nav
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final rp = context.read<RoleProvider>();
+      await rp.loadRole();
+      if (mounted) {
+        setState(() {
+          _activeEntries = _navEntriesForRole(rp.role);
+          _currentIndex = 0;
+        });
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    final role = context.watch<RoleProvider>().role;
+    final entries = _navEntriesForRole(role);
+
+    // Keep index in bounds if entries changed
+    final safeIndex = _currentIndex < entries.length ? _currentIndex : 0;
+
     return Scaffold(
-      body: IndexedStack(index: _currentIndex, children: _screens),
+      body: IndexedStack(
+        index: safeIndex,
+        children: entries.map((e) => e.screen).toList(),
+      ),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           border: Border(top: BorderSide(color: AppColors.border)),
           color: Colors.white,
         ),
         child: BottomNavigationBar(
-          currentIndex: _currentIndex,
+          currentIndex: safeIndex,
           onTap: (i) => setState(() => _currentIndex = i),
           type: BottomNavigationBarType.fixed,
           backgroundColor: Colors.white,
           elevation: 0,
           selectedItemColor: AppColors.blue,
           unselectedItemColor: AppColors.textSecondary,
-          selectedLabelStyle: GoogleFonts.inter(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-          ),
+          selectedLabelStyle: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600),
           unselectedLabelStyle: GoogleFonts.inter(fontSize: 11),
-          items: _navItems
-              .map(
-                (item) => BottomNavigationBarItem(
-                  icon: Icon(item.icon),
-                  activeIcon: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.blueSoft,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Icon(item.activeIcon, color: AppColors.blue),
-                  ),
-                  label: item.label,
-                ),
-              )
-              .toList(),
+          items: entries.map((e) => BottomNavigationBarItem(
+            icon: Icon(e.icon),
+            activeIcon: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.blueSoft,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Icon(e.activeIcon, color: AppColors.blue),
+            ),
+            label: e.label,
+          )).toList(),
         ),
       ),
     );
   }
 }
 
-class _NavItem {
-  final IconData icon;
-  final IconData activeIcon;
-  final String label;
-  const _NavItem({
-    required this.icon,
-    required this.activeIcon,
-    required this.label,
-  });
-}
+
