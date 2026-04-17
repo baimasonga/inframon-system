@@ -62,6 +62,8 @@ class _IssueReportScreenState extends State<IssueReportScreen> {
       'location_lng': _currentPosition?.longitude,
       'sync_status': 'pending',
     });
+    final nowIso = DateTime.now().toIso8601String();
+    // Write to issues table (mobile source of truth)
     await db.insert('sync_queue', {
       'entity_type': 'issue',
       'entity_id': issueId,
@@ -76,9 +78,26 @@ class _IssueReportScreenState extends State<IssueReportScreen> {
         'status': 'Open',
         'location_lat': _currentPosition?.latitude,
         'location_lng': _currentPosition?.longitude,
-        'created_at': DateTime.now().toIso8601String(),
+        'created_at': nowIso,
       }),
-      'created_at': DateTime.now().toIso8601String(),
+      'created_at': nowIso,
+    });
+    // Also sync to defect_reports so the web Issues & Defects page can display it
+    final defectId = '\${issueId}_d';
+    await db.insert('sync_queue', {
+      'entity_type': 'defect_report',
+      'entity_id': defectId,
+      'operation': 'INSERT',
+      'payload': jsonEncode({
+        'project_id': widget.projectId,
+        'title': _titleController.text,
+        'category': 'Field Report',
+        'severity': _severity[0].toUpperCase() + _severity.substring(1),
+        'recommended_action': _descController.text,
+        'status': 'Open',
+        'created_at': nowIso,
+      }),
+      'created_at': nowIso,
     });
     setState(() => _isSaving = false);
     if (mounted) Navigator.pop(context);
