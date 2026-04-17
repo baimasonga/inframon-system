@@ -176,13 +176,28 @@ class _MultiStepInspectionWizardState extends State<MultiStepInspectionWizard> {
         }
         for (int i = 0; i < _photos.length; i++) {
           final bool hasUrl = i < photoUrls.length;
+          final String nowIso = DateTime.now().toIso8601String();
           await db.insert('inspection_photos', {
             'visit_id': visitId,
             'local_path': _photos[i].path,
             'remote_url': hasUrl ? photoUrls[i] : null,
             'sync_status': hasUrl ? 'synced' : 'pending',
-            'created_at': DateTime.now().toIso8601String(),
+            'created_at': nowIso,
           });
+          // Also insert into visit_evidence so the web Media page can display it
+          if (hasUrl) {
+            try {
+              await Supabase.instance.client.from('visit_evidence').insert({
+                'visit_id': visitId,
+                'file_url': photoUrls[i],
+                'category': 'During',
+                'caption': 'Field photo ${i + 1}',
+                'created_at': nowIso,
+              });
+            } catch (e) {
+              debugPrint('[Photos] visit_evidence insert failed: \$e');
+            }
+          }
         }
       }
 
