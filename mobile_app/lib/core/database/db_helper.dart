@@ -19,7 +19,7 @@ import 'package:sqflite/sqflite.dart';
 
       return await openDatabase(
         path,
-        version: 4,
+        version: 5,
         onCreate: _createDB,
         onUpgrade: _onUpgrade,
       );
@@ -82,6 +82,23 @@ import 'package:sqflite/sqflite.dart';
         )
         """);
       }
+      if (oldVersion < 5) {
+        // Recreate workforce_records with correct schema matching WorkforceEntryScreen
+        await db.execute('DROP TABLE IF EXISTS workforce_records');
+        await db.execute("""
+        CREATE TABLE workforce_records (
+          id TEXT PRIMARY KEY,
+          project_id TEXT,
+          record_date TEXT,
+          role_category TEXT,
+          gender TEXT,
+          is_youth INTEGER DEFAULT 0,
+          count INTEGER,
+          sync_status TEXT DEFAULT 'pending',
+          created_at TEXT
+        )
+        """);
+      }
     }
 
     Future _createDB(Database db, int version) async {
@@ -130,12 +147,15 @@ import 'package:sqflite/sqflite.dart';
 
       await db.execute("""
       CREATE TABLE workforce_records (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        visit_id TEXT,
+        id TEXT PRIMARY KEY,
+        project_id TEXT,
+        record_date TEXT,
         role_category TEXT,
-        count INTEGER,
         gender TEXT,
-        is_youth INTEGER
+        is_youth INTEGER DEFAULT 0,
+        count INTEGER,
+        sync_status TEXT DEFAULT 'pending',
+        created_at TEXT
       )
       """);
 
