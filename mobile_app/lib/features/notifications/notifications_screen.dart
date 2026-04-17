@@ -187,6 +187,39 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
     } catch (e) { debugPrint('Notifications load error: $e'); }
 
+    // ── 5. Read from Supabase notifications table (web-pushed alerts) ──────
+      try {
+        final dbNotifs = await Supabase.instance.client
+            .from('notifications')
+            .select()
+            .eq('user_id', userId)
+            .eq('dismissed', false)
+            .order('created_at', ascending: false)
+            .limit(30);
+        for (final n in dbNotifs as List<dynamic>) {
+          final createdAt = DateTime.tryParse(n['created_at'] as String? ?? '') ?? DateTime.now();
+          final type = n['type'] as String? ?? 'update';
+          _AlertType aType;
+          switch (type) {
+            case 'task': aType = _AlertType.task; break;
+            case 'milestone': aType = _AlertType.milestone; break;
+            case 'risk': aType = _AlertType.risk; break;
+            case 'inspection': aType = _AlertType.inspection; break;
+            default: aType = _AlertType.update;
+          }
+          final titleExists = alerts.any((a) => a.title == (n['title'] as String? ?? ''));
+          if (!titleExists) {
+            alerts.add(_Alert(
+              type: aType,
+              title: n['title'] as String? ?? 'System Notification',
+              body: n['body'] as String? ?? '',
+              time: _timeAgo(createdAt),
+              createdAt: createdAt,
+            ));
+          }
+        }
+      } catch (e) { debugPrint('DB notifications error: $e'); }
+
     // Sort: overdue first, then by date descending
     alerts.sort((a, b) {
       final aOverdue = a.time == 'Overdue' ? 0 : 1;
