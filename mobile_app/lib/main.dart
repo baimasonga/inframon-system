@@ -634,7 +634,7 @@ class _MainShellState extends State<MainShell> {
     ProjectsListScreen(),
     TasksScreen(),
     IssuesListScreen(),
-    WorkforceEntryScreen(projectId: 'proj-1'),
+    WorkforceEntryScreen(),
     AIPhotoScreen(),
     AttendanceScreen(),
     NotificationsScreen(),
