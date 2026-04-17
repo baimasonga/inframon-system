@@ -5,8 +5,8 @@ import '../../main.dart';
 import '../../core/database/db_helper.dart';
 
 class WorkforceEntryScreen extends StatefulWidget {
-  final String projectId;
-  const WorkforceEntryScreen({super.key, required this.projectId});
+  final String? projectId;
+  const WorkforceEntryScreen({super.key, this.projectId});
 
   @override
   State<WorkforceEntryScreen> createState() => _WorkforceEntryScreenState();
@@ -19,6 +19,25 @@ class _WorkforceEntryScreenState extends State<WorkforceEntryScreen> {
   bool _isYouth = false;
   bool _isSaving = false;
   DateTime _selectedDate = DateTime.now();
+
+  // Project picker (used when no projectId is passed in)
+  List<Map<String, dynamic>> _availableProjects = [];
+  String? _selectedProjectId;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedProjectId = widget.projectId;
+    if (_selectedProjectId == null || _selectedProjectId!.isEmpty) {
+      _loadProjects();
+    }
+  }
+
+  Future<void> _loadProjects() async {
+    final db = await DatabaseHelper.instance.database;
+    final rows = await db.query('projects', columns: ['id', 'name'], orderBy: 'name ASC');
+    if (mounted) setState(() => _availableProjects = List<Map<String, dynamic>>.from(rows));
+  }
 
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
@@ -44,18 +63,28 @@ class _WorkforceEntryScreenState extends State<WorkforceEntryScreen> {
       return;
     }
     setState(() => _isSaving = true);
+    final activeProjectId = _selectedProjectId ?? '';
+    if (activeProjectId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a project first')),
+      );
+      setState(() => _isSaving = false);
+      return;
+    }
     final db = await DatabaseHelper.instance.database;
     final id = DateTime.now().millisecondsSinceEpoch.toString();
     final dateStr = _selectedDate.toIso8601String().split('T').first;
+    final nowIso = DateTime.now().toIso8601String();
     await db.insert('workforce_records', {
       'id': id,
-      'project_id': widget.projectId,
+      'project_id': activeProjectId,
       'record_date': dateStr,
       'role_category': _role,
       'gender': _gender,
       'is_youth': _isYouth ? 1 : 0,
       'count': int.parse(_countController.text),
       'sync_status': 'pending',
+      'created_at': nowIso,
     });
     await db.insert('sync_queue', {
       'entity_type': 'workforce_record',
@@ -63,15 +92,15 @@ class _WorkforceEntryScreenState extends State<WorkforceEntryScreen> {
       'operation': 'INSERT',
       'payload': jsonEncode({
         'id': id,
-        'project_id': widget.projectId,
+        'project_id': activeProjectId,
         'record_date': dateStr,
         'role_category': _role,
         'gender': _gender,
         'is_youth': _isYouth,
         'count': int.parse(_countController.text),
-        'created_at': DateTime.now().toIso8601String(),
+        'created_at': nowIso,
       }),
-      'created_at': DateTime.now().toIso8601String(),
+      'created_at': nowIso,
     });
     if (mounted) Navigator.pop(context);
   }
@@ -87,6 +116,41 @@ class _WorkforceEntryScreenState extends State<WorkforceEntryScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          // ── Project Picker (when launched from nav bar without a projectId) ──
+          if (widget.projectId == null || widget.projectId!.isEmpty) ...[
+            _SectionTitle('Project'),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: _availableProjects.isEmpty
+                  ? const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: Text('No projects found. Sync projects first.',
+                          style: TextStyle(color: Color(0xFF64748B))),
+                    )
+                  : DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        isExpanded: true,
+                        value: _selectedProjectId,
+                        hint: const Text('Select project'),
+                        items: _availableProjects.map((p) {
+                          return DropdownMenuItem<String>(
+                            value: p['id'] as String,
+                            child: Text(p['name'] as String? ?? p['id'] as String),
+                          );
+                        }).toList(),
+                        onChanged: (v) => setState(() => _selectedProjectId = v),
+                      ),
+                    ),
+            ),
+            const SizedBox(height: 16),
+          ],
+
           // ── Date Picker ─────────────────────────────────────────────
           _SectionTitle('Work Date'),
           const SizedBox(height: 8),
