@@ -178,10 +178,13 @@ import 'dart:typed_data';
                   tableName = 'workforce_records';
                 } else if (type == 'issue') {
                   tableName = 'issues';
-                } else if (type == 'inspection') {
-                  tableName = 'inspections';
+                } else if (type == 'defect_report') {
+                  tableName = 'defect_reports';
                 } else if (type == 'attendance_log') {
                   tableName = 'attendance_logs';
+                } else if (type == 'inspection') {
+                  // 'inspection' is legacy — field reports go via field_report/RPC
+                  tableName = 'visit_metadata';
                 } else {
                   tableName = type;
                 }
