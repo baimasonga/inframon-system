@@ -185,9 +185,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         }
       } catch (e) { debugPrint('Audit notifications error: $e'); }
 
-    } catch (e) { debugPrint('Notifications load error: $e'); }
-
-    // ── 5. Read from Supabase notifications table (web-pushed alerts) ──────
+      // ── 5. Read from Supabase notifications table (web-pushed alerts) ──────
       try {
         final dbNotifs = await Supabase.instance.client
             .from('notifications')
@@ -219,6 +217,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           }
         }
       } catch (e) { debugPrint('DB notifications error: $e'); }
+
+    } catch (e) { debugPrint('Notifications load error: $e'); }
 
     // Sort: overdue first, then by date descending
     alerts.sort((a, b) {
